@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sorteador Pro - Instagram, Facebook e Números</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Canvas Confetti CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+  <div class="background-glow glow-1"></div>
+  <div class="background-glow glow-2"></div>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">🎲</span>
+        <div class="logo-text">
+          <h1>Sorteador<span>Pro</span></h1>
+          <p>Sorteios justos, animados e transparentes</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-container">
+      <button class="tab-btn active" data-tab="tab-names">
+        <span class="tab-icon">👥</span>
+        Nomes / Comentários
+      </button>
+      <button class="tab-btn" data-tab="tab-numbers">
+        <span class="tab-icon">🔢</span>
+        Sortear Números
+      </button>
+    </div>
+
+    <!-- Main Card -->
+    <main class="main-card">
+      
+      <!-- TAB 1: Nomes / Comentários -->
+      <section id="tab-names" class="tab-content active">
+        <div class="form-group">
+          <div class="label-row">
+            <label for="names-input">Cole a lista de participantes ou comentários:</label>
+            <span class="counter-badge" id="lines-count">0 participantes</span>
+          </div>
+          <textarea 
+            id="names-input" 
+            placeholder="Exemplo:
+@joaosilva - Eu quero ganhar! @amigo1
+@maria.lima - Parabéns pelo sorteio! @amigo2
+@carlos_dev
+@ana_souza"
+          ></textarea>
+          <small class="hint">Dica: Um participante ou comentário por linha.</small>
+        </div>
+
+        <!-- Rules & Filters Grid -->
+        <div class="options-grid">
+          <div class="option-card">
+            <label class="switch-container">
+              <input type="checkbox" id="opt-remove-duplicates" checked>
+              <span class="checkmark"></span>
+              <span class="opt-label">Remover duplicados (1 chance por pessoa)</span>
+            </label>
+          </div>
+
+          <div class="option-card">
+            <label class="switch-container">
+              <input type="checkbox" id="opt-require-mention">
+              <span class="checkmark"></span>
+              <span class="opt-label">Exigir marcação com @</span>
+            </label>
+          </div>
+
+          <div class="option-card input-number-card">
+            <label for="winners-count">Qtd. de Vencedores:</label>
+            <input type="number" id="winners-count" min="1" max="50" value="1">
+          </div>
+
+          <div class="option-card input-number-card">
+            <label for="substitutes-count">Qtd. de Reservas (Suplentes):</label>
+            <input type="number" id="substitutes-count" min="0" max="10" value="1">
+          </div>
+        </div>
+
+        <button id="btn-draw-names" class="btn-primary">
+          <span class="btn-icon">⚡</span> REALIZAR SORTEIO
+        </button>
+      </section>
+
+      <!-- TAB 2: Números -->
+      <section id="tab-numbers" class="tab-content">
+        <div class="numbers-grid">
+          <div class="form-group">
+            <label for="num-min">Número Mínimo:</label>
+            <input type="number" id="num-min" value="1">
+          </div>
+          <div class="form-group">
+            <label for="num-max">Número Máximo:</label>
+            <input type="number" id="num-max" value="100">
+          </div>
+          <div class="form-group">
+            <label for="num-qty">Quantos Números Sortear:</label>
+            <input type="number" id="num-qty" min="1" max="50" value="1">
+          </div>
+        </div>
+
+        <div class="option-card full-width">
+          <label class="switch-container">
+            <input type="checkbox" id="opt-allow-repeated-numbers">
+            <span class="checkmark"></span>
+            <span class="opt-label">Permitir números repetidos</span>
+          </label>
+        </div>
+
+        <button id="btn-draw-numbers" class="btn-primary">
+          <span class="btn-icon">⚡</span> SORTEAR NÚMEROS
+        </button>
+      </section>
+
+      <!-- Animation Area (Hidden by default) -->
+      <div id="animation-box" class="animation-box hidden">
+        <p class="animation-title">Sorteando vencedor...</p>
+        <div class="roulette-display" id="roulette-display">???</div>
+        <div class="loading-bar"><div class="progress"></div></div>
+      </div>
+
+      <!-- Results Area (Hidden by default) -->
+      <div id="result-box" class="result-box hidden">
+        <div class="result-header">
+          <span class="trophy-icon">🏆</span>
+          <h2>Resultado Oficial</h2>
+          <span class="timestamp" id="result-timestamp"></span>
+        </div>
+
+        <div class="winners-list" id="winners-list">
+          <!-- Injected via JavaScript -->
+        </div>
+
+        <div class="substitutes-list hidden" id="substitutes-section">
+          <h3>Suplentes / Reservas:</h3>
+          <div id="substitutes-list"></div>
+        </div>
+
+        <div class="result-actions">
+          <button id="btn-copy-result" class="btn-secondary">📋 Copiar Resultado</button>
+          <button id="btn-new-draw" class="btn-outline">Novo Sorteio</button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Desenvolvido com 100% de imparcialidade criptográfica (Web Crypto API)</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
