@@ -22,16 +22,16 @@
         <span class="logo-icon">🎲</span>
         <div class="logo-text">
           <h1>Sorteador<span>Pro</span></h1>
-          <p>Sorteios justos, animados e transparentes</p>
+          <p>Sorteios oficiais de Instagram, Facebook e Números</p>
         </div>
       </div>
     </header>
 
     <!-- Navigation Tabs -->
     <div class="tabs-container">
-      <button class="tab-btn active" data-tab="tab-names">
-        <span class="tab-icon">👥</span>
-        Nomes / Comentários
+      <button class="tab-btn active" data-tab="tab-social">
+        <span class="tab-icon">📱</span>
+        Instagram & Facebook
       </button>
       <button class="tab-btn" data-tab="tab-numbers">
         <span class="tab-icon">🔢</span>
@@ -42,50 +42,79 @@
     <!-- Main Card -->
     <main class="main-card">
       
-      <!-- TAB 1: Nomes / Comentários -->
-      <section id="tab-names" class="tab-content active">
-        <div class="form-group">
+      <!-- TAB 1: Sorteio Redes Sociais -->
+      <section id="tab-social" class="tab-content active">
+        
+        <!-- Link Input Box -->
+        <div class="link-fetch-card">
+          <div class="link-header">
+            <label for="post-url">🔗 Cole o link da publicação oficial:</label>
+            <span class="network-badge" id="detected-network">Aguardando link...</span>
+          </div>
+          <div class="input-with-button">
+            <input 
+              type="url" 
+              id="post-url" 
+              placeholder="Ex: https://www.instagram.com/p/C-xyz123... ou Facebook" 
+              autocomplete="off"
+            >
+            <button id="btn-fetch-comments" class="btn-fetch">
+              <span class="btn-spinner hidden" id="fetch-spinner"></span>
+              <span id="btn-fetch-text">Carregar Comentários</span>
+            </button>
+          </div>
+          <div id="fetch-status-msg" class="fetch-status-msg hidden"></div>
+        </div>
+
+        <!-- Participants Area -->
+        <div class="form-group" style="margin-top: 20px;">
           <div class="label-row">
-            <label for="names-input">Cole a lista de participantes ou comentários:</label>
+            <label for="names-input">Comentários carregados / Participantes:</label>
             <span class="counter-badge" id="lines-count">0 participantes</span>
           </div>
           <textarea 
             id="names-input" 
-            placeholder="Exemplo:
-@joaosilva - Eu quero ganhar! @amigo1
-@maria.lima - Parabéns pelo sorteio! @amigo2
-@carlos_dev
-@ana_souza"
+            placeholder="Os comentários aparecerão aqui automaticamente após carregar o link acima. Você também pode colar ou editar os nomes manualmente se preferir."
           ></textarea>
-          <small class="hint">Dica: Um participante ou comentário por linha.</small>
         </div>
 
         <!-- Rules & Filters Grid -->
         <div class="options-grid">
+          
+          <!-- Multiple Winners -->
+          <div class="option-card input-highlight">
+            <div class="option-info">
+              <span class="opt-title">🏆 Ganhadores Principais</span>
+              <span class="opt-desc">Quantas pessoas serão sorteadas</span>
+            </div>
+            <input type="number" id="winners-count" min="1" max="50" value="1" class="styled-number-input">
+          </div>
+
+          <!-- Substitutes / Reserves -->
+          <div class="option-card input-highlight">
+            <div class="option-info">
+              <span class="opt-title">🛡️ Ganhadores Substitutos</span>
+              <span class="opt-desc">Suplentes em caso de desclassificação</span>
+            </div>
+            <input type="number" id="substitutes-count" min="0" max="20" value="1" class="styled-number-input">
+          </div>
+
+          <!-- Filter 1: Duplicates -->
           <div class="option-card">
             <label class="switch-container">
               <input type="checkbox" id="opt-remove-duplicates" checked>
               <span class="checkmark"></span>
-              <span class="opt-label">Remover duplicados (1 chance por pessoa)</span>
+              <span class="opt-label">Remover comentários repetidos (1 chance por perfil)</span>
             </label>
           </div>
 
+          <!-- Filter 2: Mentions -->
           <div class="option-card">
             <label class="switch-container">
               <input type="checkbox" id="opt-require-mention">
               <span class="checkmark"></span>
-              <span class="opt-label">Exigir marcação com @</span>
+              <span class="opt-label">Exigir marcação de amigo com @</span>
             </label>
-          </div>
-
-          <div class="option-card input-number-card">
-            <label for="winners-count">Qtd. de Vencedores:</label>
-            <input type="number" id="winners-count" min="1" max="50" value="1">
-          </div>
-
-          <div class="option-card input-number-card">
-            <label for="substitutes-count">Qtd. de Reservas (Suplentes):</label>
-            <input type="number" id="substitutes-count" min="0" max="10" value="1">
           </div>
         </div>
 
@@ -126,7 +155,7 @@
 
       <!-- Animation Area (Hidden by default) -->
       <div id="animation-box" class="animation-box hidden">
-        <p class="animation-title">Sorteando vencedor...</p>
+        <p class="animation-title">Sorteando os vencedores...</p>
         <div class="roulette-display" id="roulette-display">???</div>
         <div class="loading-bar"><div class="progress"></div></div>
       </div>
@@ -135,21 +164,30 @@
       <div id="result-box" class="result-box hidden">
         <div class="result-header">
           <span class="trophy-icon">🏆</span>
-          <h2>Resultado Oficial</h2>
+          <h2>Resultado Oficial do Sorteio</h2>
           <span class="timestamp" id="result-timestamp"></span>
         </div>
 
+        <!-- Winners Section -->
+        <div class="section-results-title">
+          <span>🎉 Ganhador(es) Titular(es):</span>
+        </div>
         <div class="winners-list" id="winners-list">
           <!-- Injected via JavaScript -->
         </div>
 
-        <div class="substitutes-list hidden" id="substitutes-section">
-          <h3>Suplentes / Reservas:</h3>
-          <div id="substitutes-list"></div>
+        <!-- Substitutes Section -->
+        <div class="substitutes-section hidden" id="substitutes-section">
+          <div class="section-results-title subtitle">
+            <span>🛡️ Ganhador(es) Substituto(s) / Reservas:</span>
+          </div>
+          <div class="substitutes-list" id="substitutes-list">
+            <!-- Injected via JavaScript -->
+          </div>
         </div>
 
         <div class="result-actions">
-          <button id="btn-copy-result" class="btn-secondary">📋 Copiar Resultado</button>
+          <button id="btn-copy-result" class="btn-secondary">📋 Copiar Resultado Formatado</button>
           <button id="btn-new-draw" class="btn-outline">Novo Sorteio</button>
         </div>
       </div>
@@ -158,7 +196,7 @@
 
     <!-- Footer -->
     <footer class="footer">
-      <p>Desenvolvido com 100% de imparcialidade criptográfica (Web Crypto API)</p>
+      <p>Desenvolvido com imparcialidade criptográfica (Web Crypto API) &bull; SorteadorPro</p>
     </footer>
   </div>
 
