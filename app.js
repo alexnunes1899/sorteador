@@ -1,8 +1,27 @@
 // ==========================================
-// CONFIGURAÇÃO INTEGRADA DA API
+// CONFIGURAÇÃO INTEGRADA DA API (Multi-Provedor RapidAPI)
 // ==========================================
 const DEFAULT_RAPIDAPI_KEY = '33f3227ee8msh6818ae7d446c656p1a527ejsn067883af0870';
-const RAPIDAPI_HOST = 'instagram-scraper-api2.p.rapidapi.com';
+const RAPIDAPI_PROVIDERS = [
+  {
+    name: 'Instagram Scraper Stable API',
+    host: 'instagram-scraper-stable-api.p.rapidapi.com',
+    buildUrl: (shortcode, url, cursor) => {
+      let ep = `https://instagram-scraper-stable-api.p.rapidapi.com/get_post_comments.php?media_code=${encodeURIComponent(shortcode || url)}`;
+      if (cursor) ep += `&pagination_token=${encodeURIComponent(cursor)}`;
+      return ep;
+    }
+  },
+  {
+    name: 'Instagram Scraper API2',
+    host: 'instagram-scraper-api2.p.rapidapi.com',
+    buildUrl: (shortcode, url, cursor) => {
+      let ep = `https://instagram-scraper-api2.p.rapidapi.com/v1/comments?code_or_id_or_url=${encodeURIComponent(shortcode || url)}`;
+      if (cursor) ep += `&pagination_token=${encodeURIComponent(cursor)}`;
+      return ep;
+    }
+  }
+];
 
 // ==========================================
 // AUDIO SYNTHESIZER (Lazy Web Audio API)
@@ -240,45 +259,67 @@ async function fetchCommentsFromUrl(url) {
 
   try {
     const shortcode = extractInstagramShortcode(url);
-    const queryTarget = shortcode || url;
+    if (!shortcode) {
+      throw new Error('Cole o link direto de um Post ou Reel do Instagram (ex: https://www.instagram.com/p/CODIGO/).');
+    }
+
     const allComments = [];
-    let paginationToken = null;
     const maxPages = 5;
+    let activeProvider = null;
 
-    for (let page = 0; page < maxPages; page++) {
-      let endpoint = `https://${RAPIDAPI_HOST}/v1/comments?code_or_id_or_url=${encodeURIComponent(queryTarget)}`;
-      if (paginationToken) {
-        endpoint += `&pagination_token=${encodeURIComponent(paginationToken)}`;
-      }
-
-      const response = await fetch(endpoint, {
+    // Encontra o provedor RapidAPI ativo na conta
+    for (const provider of RAPIDAPI_PROVIDERS) {
+      const firstResponse = await fetch(provider.buildUrl(shortcode, url, null), {
         method: 'GET',
         headers: {
           'x-rapidapi-key': DEFAULT_RAPIDAPI_KEY,
-          'x-rapidapi-host': RAPIDAPI_HOST
+          'x-rapidapi-host': provider.host
         }
       });
 
-      if (response.status === 401 || response.status === 403) {
-        throw new Error('Falta ativar o plano gratuito (Subscribe) na página da API Instagram Scraper API2 na RapidAPI.');
+      if (firstResponse.status === 401 || firstResponse.status === 403) {
+        continue; // Tenta o próximo provedor configurado
       }
-      if (response.status === 429) {
+      if (firstResponse.status === 429) {
         throw new Error('Limite gratuito de buscas da API atingido neste momento. Use a aba "📊 Planilha / Lista" sem limites!');
       }
-      if (!response.ok) {
-        throw new Error(`Não foi possível consultar esta publicação (HTTP ${response.status}).`);
+      if (!firstResponse.ok) {
+        throw new Error(`Não foi possível consultar esta publicação (HTTP ${firstResponse.status}).`);
       }
 
-      const data = await response.json();
-      const pageItems = data?.data?.items || data?.items || data?.comments || [];
-
-      if (Array.isArray(pageItems) && pageItems.length > 0) {
-        allComments.push(...pageItems);
+      activeProvider = provider;
+      const firstData = await firstResponse.json();
+      const firstItems = firstData?.comments || firstData?.data?.comments || firstData?.data?.items || firstData?.items || [];
+      if (Array.isArray(firstItems) && firstItems.length > 0) {
+        allComments.push(...firstItems);
         showStatusMessage(fetchStatusMsg, `Buscando comentários... (${allComments.length} carregados)`, 'info');
       }
 
-      paginationToken = data?.pagination_token || data?.data?.pagination_token || null;
-      if (!paginationToken || pageItems.length === 0) break;
+      let paginationToken = firstData?.pagination_token || firstData?.next_max_id || firstData?.data?.pagination_token || null;
+
+      for (let page = 1; page < maxPages && paginationToken && firstItems.length > 0; page++) {
+        const nextResp = await fetch(activeProvider.buildUrl(shortcode, url, paginationToken), {
+          method: 'GET',
+          headers: {
+            'x-rapidapi-key': DEFAULT_RAPIDAPI_KEY,
+            'x-rapidapi-host': activeProvider.host
+          }
+        });
+        if (!nextResp.ok) break;
+        const nextData = await nextResp.json();
+        const nextItems = nextData?.comments || nextData?.data?.comments || nextData?.data?.items || nextData?.items || [];
+        if (Array.isArray(nextItems) && nextItems.length > 0) {
+          allComments.push(...nextItems);
+          showStatusMessage(fetchStatusMsg, `Buscando comentários... (${allComments.length} carregados)`, 'info');
+        }
+        paginationToken = nextData?.pagination_token || nextData?.next_max_id || nextData?.data?.pagination_token || null;
+        if (nextItems.length === 0) break;
+      }
+      break;
+    }
+
+    if (!activeProvider) {
+      throw new Error('Falta clicar em "Subscribe" no plano grátis ($0.00) da API "Instagram Scraper Stable API" na RapidAPI.');
     }
 
     if (allComments.length > 0) {
