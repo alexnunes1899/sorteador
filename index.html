@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <!-- Canvas Confetti CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" defer></script>
 </head>
 <body>
   <div class="background-glow glow-1"></div>
@@ -28,12 +28,12 @@
     </header>
 
     <!-- Navigation Tabs -->
-    <div class="tabs-container">
-      <button class="tab-btn active" data-tab="tab-social">
+    <div class="tabs-container" role="tablist">
+      <button type="button" class="tab-btn active" data-tab="tab-social" role="tab" aria-selected="true">
         <span class="tab-icon">📱</span>
-        Instagram & Facebook
+        Instagram &amp; Facebook
       </button>
-      <button class="tab-btn" data-tab="tab-numbers">
+      <button type="button" class="tab-btn" data-tab="tab-numbers" role="tab" aria-selected="false">
         <span class="tab-icon">🔢</span>
         Sortear Números
       </button>
@@ -43,7 +43,7 @@
     <main class="main-card">
       
       <!-- TAB 1: Sorteio Redes Sociais -->
-      <section id="tab-social" class="tab-content active">
+      <section id="tab-social" class="tab-content active" role="tabpanel">
         
         <!-- Método 1: Por Link -->
         <div class="link-fetch-card">
@@ -51,7 +51,7 @@
             <label for="post-url">🔗 Método 1: Cole o link do Post</label>
             <div class="header-actions">
               <span class="network-badge" id="detected-network">Aguardando link...</span>
-              <button id="btn-open-api-modal" class="btn-api-settings" title="Configurar chave de API para busca direta">⚙️ API</button>
+              <button type="button" id="btn-open-api-modal" class="btn-api-settings" title="Configurar chave de API para busca direta">⚙️ API</button>
             </div>
           </div>
           <div class="input-with-button">
@@ -61,12 +61,12 @@
               placeholder="Ex: https://www.instagram.com/p/C-xyz123... ou Facebook" 
               autocomplete="off"
             >
-            <button id="btn-fetch-comments" class="btn-fetch">
+            <button type="button" id="btn-fetch-comments" class="btn-fetch">
               <span class="btn-spinner hidden" id="fetch-spinner"></span>
               <span id="btn-fetch-text">Carregar pelo Link</span>
             </button>
           </div>
-          <div id="fetch-status-msg" class="fetch-status-msg hidden"></div>
+          <div id="fetch-status-msg" class="fetch-status-msg hidden" role="status" aria-live="polite"></div>
         </div>
 
         <!-- Divisor OU -->
@@ -75,13 +75,13 @@
         </div>
 
         <!-- Método 2: Importar Arquivo -->
-        <div class="file-import-card" id="drop-zone">
-          <input type="file" id="file-input" accept=".csv, .txt, .tsv, .json" class="hidden-file-input">
+        <div class="file-import-card" id="drop-zone" role="button" tabindex="0" aria-label="Importar arquivo de comentários">
+          <input type="file" id="file-input" accept=".csv,.txt,.tsv,.json" class="hidden-file-input">
           <div class="import-content">
             <span class="upload-icon">📁</span>
             <div class="upload-text">
               <strong>Método 2: Importar arquivo de comentários</strong>
-              <p>Arraste seu arquivo <code>.csv</code> ou <code>.txt</code> aqui ou <span class="highlight-link" id="trigger-file-select">clique para selecionar</span></p>
+              <p>Arraste seu arquivo <code>.csv</code>, <code>.txt</code>, <code>.tsv</code> ou <code>.json</code> aqui ou <span class="highlight-link" id="trigger-file-select">clique para selecionar</span></p>
             </div>
           </div>
         </div>
@@ -91,13 +91,13 @@
           <div class="label-row">
             <label for="names-input">Lista de Comentários / Participantes:</label>
             <div class="badge-actions">
-              <button id="btn-clear-names" class="btn-clear" title="Limpar lista">🗑️ Limpar</button>
+              <button type="button" id="btn-clear-names" class="btn-clear" title="Limpar lista">🗑️ Limpar</button>
               <span class="counter-badge" id="lines-count">0 participantes</span>
             </div>
           </div>
           <textarea 
             id="names-input" 
-            placeholder="Os comentários carregados pelo link ou pelo arquivo aparecerão aqui. Você também pode colar diretamente se desejar."
+            placeholder="Formato sugerido (1 por linha):&#10;@usuario - Comentário marcando @amigo1&#10;Ou apenas @usuario"
           ></textarea>
         </div>
 
@@ -107,19 +107,19 @@
           <!-- Multiple Winners -->
           <div class="option-card input-highlight">
             <div class="option-info">
-              <span class="opt-title">🏆 Ganhadores Principais</span>
+              <label for="winners-count" class="opt-title">🏆 Ganhadores Principais</label>
               <span class="opt-desc">Quantas pessoas serão sorteadas</span>
             </div>
-            <input type="number" id="winners-count" min="1" max="50" value="1" class="styled-number-input">
+            <input type="number" id="winners-count" min="1" max="100" value="1" class="styled-number-input">
           </div>
 
           <!-- Substitutes / Reserves -->
           <div class="option-card input-highlight">
             <div class="option-info">
-              <span class="opt-title">🛡️ Ganhadores Substitutos</span>
+              <label for="substitutes-count" class="opt-title">🛡️ Ganhadores Substitutos</label>
               <span class="opt-desc">Suplentes em caso de desclassificação</span>
             </div>
-            <input type="number" id="substitutes-count" min="0" max="20" value="1" class="styled-number-input">
+            <input type="number" id="substitutes-count" min="0" max="50" value="1" class="styled-number-input">
           </div>
 
           <!-- Filter 1: Duplicates -->
@@ -141,13 +141,13 @@
           </div>
         </div>
 
-        <button id="btn-draw-names" class="btn-primary">
+        <button type="button" id="btn-draw-names" class="btn-primary">
           <span class="btn-icon">⚡</span> REALIZAR SORTEIO
         </button>
       </section>
 
       <!-- TAB 2: Números -->
-      <section id="tab-numbers" class="tab-content">
+      <section id="tab-numbers" class="tab-content" role="tabpanel">
         <div class="numbers-grid">
           <div class="form-group">
             <label for="num-min">Número Mínimo:</label>
@@ -159,7 +159,7 @@
           </div>
           <div class="form-group">
             <label for="num-qty">Quantos Números Sortear:</label>
-            <input type="number" id="num-qty" min="1" max="50" value="1">
+            <input type="number" id="num-qty" min="1" max="100" value="1">
           </div>
         </div>
 
@@ -171,20 +171,20 @@
           </label>
         </div>
 
-        <button id="btn-draw-numbers" class="btn-primary">
+        <button type="button" id="btn-draw-numbers" class="btn-primary">
           <span class="btn-icon">⚡</span> SORTEAR NÚMEROS
         </button>
       </section>
 
       <!-- Animation Area (Hidden by default) -->
-      <div id="animation-box" class="animation-box hidden">
+      <div id="animation-box" class="animation-box hidden" aria-live="off">
         <p class="animation-title">Sorteando os vencedores...</p>
         <div class="roulette-display" id="roulette-display">???</div>
         <div class="loading-bar"><div class="progress"></div></div>
       </div>
 
       <!-- Results Area (Hidden by default) -->
-      <div id="result-box" class="result-box hidden">
+      <div id="result-box" class="result-box hidden" aria-live="polite">
         <div class="result-header">
           <span class="trophy-icon">🏆</span>
           <h2>Resultado Oficial do Sorteio</h2>
@@ -210,30 +210,30 @@
         </div>
 
         <div class="result-actions">
-          <button id="btn-copy-result" class="btn-secondary">📋 Copiar Resultado Formatado</button>
-          <button id="btn-new-draw" class="btn-outline">Novo Sorteio</button>
+          <button type="button" id="btn-copy-result" class="btn-secondary">📋 Copiar Resultado Formatado</button>
+          <button type="button" id="btn-new-draw" class="btn-outline">Novo Sorteio</button>
         </div>
       </div>
 
     </main>
 
     <!-- Modal de Configuração de API (Opcional) -->
-    <div id="api-modal" class="modal-overlay hidden">
+    <div id="api-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="api-modal-title">
       <div class="modal-card">
         <div class="modal-header">
-          <h3>⚙️ Conectar API de Scraping</h3>
-          <button id="btn-close-modal" class="btn-close-modal">&times;</button>
+          <h3 id="api-modal-title">⚙️ Conectar API de Scraping</h3>
+          <button type="button" id="btn-close-modal" class="btn-close-modal" aria-label="Fechar janela">&times;</button>
         </div>
         <div class="modal-body">
-          <p>Para buscar comentários pelo link sem passar por bloqueios da Meta, você pode conectar uma chave gratuita da <strong>RapidAPI</strong> (ex: Instagram Scraper API).</p>
+          <p>Para buscar comentários pelo link do Instagram automaticamente, conecte uma chave gratuita da <strong>RapidAPI</strong> (serviço <em>Instagram Scraper API2</em>).</p>
           <div class="form-group" style="margin-top: 14px;">
             <label for="rapidapi-key">Sua RapidAPI Key (opcional):</label>
-            <input type="text" id="rapidapi-key" placeholder="Ex: 8f92b7c4a1msh... (fica salva apenas no seu navegador)">
+            <input type="password" id="rapidapi-key" placeholder="Ex: 8f92b7c4a1msh... (salva apenas no seu navegador)" autocomplete="off">
           </div>
-          <small class="hint">Deixe em branco para usar o importador de arquivo .csv/.txt sem precisar de chave.</small>
+          <small class="hint">Deixe em branco para usar gratuitamente o importador de arquivo (.csv, .txt, .tsv, .json) sem precisar de chave.</small>
         </div>
         <div class="modal-footer">
-          <button id="btn-save-api-key" class="btn-primary" style="padding: 10px 18px; font-size: 0.9rem;">Salvar Chave</button>
+          <button type="button" id="btn-save-api-key" class="btn-primary" style="padding: 10px 18px; font-size: 0.9rem;">Salvar Configuração</button>
         </div>
       </div>
     </div>
