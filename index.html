@@ -47,6 +47,18 @@
 
     <!-- Main Card -->
     <main class="main-card">
+
+      <!-- Nome / Identificação do Sorteio (Compartilhado entre as abas) -->
+      <div id="giveaway-meta-box" class="giveaway-meta-box">
+        <label for="giveaway-title">🏷️ Nome do Sorteio <span class="optional-tag">(identificação no resultado e na arte)</span></label>
+        <input
+          type="text"
+          id="giveaway-title"
+          maxlength="80"
+          placeholder="Ex: Sorteio iPhone 16 / Kit Beleza / Rifa Especial #01"
+          autocomplete="off"
+        >
+      </div>
       
       <!-- ========================================== -->
       <!-- ABA 1: SORTEIO DIRETO POR LINK             -->
@@ -69,7 +81,7 @@
               <span id="btn-fetch-text">Carregar Comentários</span>
             </button>
           </div>
-          <small class="hint">Basta colar o link do post ou reel público e clicar em <strong>Realizar Sorteio</strong> (ou carregar antes para conferir a lista).</small>
+          <small class="hint">Basta colar o link do post ou reel público e clicar em <strong>Realizar Sorteio</strong> (a foto e o nome do ganhador serão capturados automaticamente).</small>
           <div id="fetch-status-msg" class="fetch-status-msg hidden" role="status" aria-live="polite"></div>
         </div>
 
@@ -228,7 +240,7 @@
 
       <!-- Animation Area (Hidden by default) -->
       <div id="animation-box" class="animation-box hidden" aria-live="off">
-        <p class="animation-title">Sorteando os vencedores...</p>
+        <p class="animation-title" id="animation-title">Sorteando os vencedores...</p>
         <div class="roulette-display" id="roulette-display">???</div>
         <div class="loading-bar"><div class="progress"></div></div>
       </div>
@@ -237,6 +249,7 @@
       <div id="result-box" class="result-box hidden" aria-live="polite">
         <div class="result-header">
           <span class="trophy-icon">🏆</span>
+          <div class="giveaway-result-pill" id="result-giveaway-badge">Sorteio Oficial</div>
           <h2>Resultado Oficial do Sorteio</h2>
           <span class="timestamp" id="result-timestamp"></span>
         </div>
@@ -257,6 +270,51 @@
           <div class="substitutes-list" id="substitutes-list">
             <!-- Injected via JavaScript -->
           </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- GERADOR DE ARTE / TEMPLATE DO GANHADOR     -->
+        <!-- ========================================== -->
+        <div class="post-generator-card" id="post-generator-card">
+          <div class="post-gen-header">
+            <div class="post-gen-title">
+              <span>🎨 Template Pronto para Postar</span>
+              <small>Baixe a imagem oficial com nome e foto do ganhador</small>
+            </div>
+            <div class="format-toggle" role="group" aria-label="Formato da imagem">
+              <button type="button" class="format-btn active" data-format="feed">📱 Feed (1:1)</button>
+              <button type="button" class="format-btn" data-format="stories">📲 Stories (9:16)</button>
+            </div>
+          </div>
+
+          <!-- Seletor de Ganhador quando houver múltiplos vencedores -->
+          <div id="card-winner-selector-wrap" class="card-winner-selector-wrap hidden">
+            <label for="card-winner-select">Exibir na arte:</label>
+            <select id="card-winner-select" class="card-winner-select"></select>
+          </div>
+
+          <!-- Preview ao vivo do Canvas -->
+          <div class="canvas-preview-wrapper">
+            <canvas id="winner-post-canvas" width="1080" height="1080"></canvas>
+          </div>
+
+          <!-- Personalização rápida da Arte (Nome do Sorteio + Upload opcional de Foto) -->
+          <div class="post-gen-controls">
+            <div class="post-edit-title-group">
+              <label for="result-title-edit">🏷️ Título na arte:</label>
+              <input type="text" id="result-title-edit" maxlength="80" placeholder="Digite o nome do sorteio...">
+            </div>
+            <div class="post-photo-actions">
+              <input type="file" id="winner-photo-upload" accept="image/*" class="hidden-file-input">
+              <button type="button" id="btn-upload-photo" class="btn-photo-upload">
+                📷 Enviar / Trocar Foto
+              </button>
+            </div>
+          </div>
+
+          <button type="button" id="btn-download-post" class="btn-download-post">
+            ⬇️ Baixar Arte do Ganhador (PNG Alta Resolução)
+          </button>
         </div>
 
         <div class="result-actions">
