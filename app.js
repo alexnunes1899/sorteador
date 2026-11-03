@@ -23,7 +23,7 @@ function playTickSound() {
 
 function playWinSound() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
-  const notes = [261.63, 329.63, 392.00, 523.25]; // C chord arpeggio
+  const notes = [261.63, 329.63, 392.00, 523.25];
   notes.forEach((freq, idx) => {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -56,15 +56,29 @@ function getRandomIndex(max) {
 // ==========================================
 const tabBtns = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
+
+// Link & API Elements
 const postUrlInput = document.getElementById('post-url');
 const detectedNetworkBadge = document.getElementById('detected-network');
 const btnFetchComments = document.getElementById('btn-fetch-comments');
 const btnFetchText = document.getElementById('btn-fetch-text');
 const fetchSpinner = document.getElementById('fetch-spinner');
 const fetchStatusMsg = document.getElementById('fetch-status-msg');
+const btnOpenApiModal = document.getElementById('btn-open-api-modal');
+const apiModal = document.getElementById('api-modal');
+const btnCloseModal = document.getElementById('btn-close-modal');
+const btnSaveApiKey = document.getElementById('btn-save-api-key');
+const rapidApiKeyInput = document.getElementById('rapidapi-key');
 
+// File Import Elements
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const triggerFileSelect = document.getElementById('trigger-file-select');
+
+// Names & Results
 const namesInput = document.getElementById('names-input');
 const linesCountBadge = document.getElementById('lines-count');
+const btnClearNames = document.getElementById('btn-clear-names');
 
 const btnDrawNames = document.getElementById('btn-draw-names');
 const btnDrawNumbers = document.getElementById('btn-draw-numbers');
@@ -78,6 +92,10 @@ const substitutesList = document.getElementById('substitutes-list');
 const resultTimestamp = document.getElementById('result-timestamp');
 const btnCopyResult = document.getElementById('btn-copy-result');
 const btnNewDraw = document.getElementById('btn-new-draw');
+
+// Initialize API Key from LocalStorage
+const savedApiKey = localStorage.getItem('sorteador_rapidapi_key') || '';
+if (rapidApiKeyInput) rapidApiKeyInput.value = savedApiKey;
 
 // Tab Switching
 tabBtns.forEach(btn => {
@@ -113,7 +131,27 @@ postUrlInput.addEventListener('input', () => {
 });
 
 // ==========================================
-// FETCH COMMENTS BY LINK (Meta / CORS Handler)
+// API MODAL CONTROLS
+// ==========================================
+btnOpenApiModal.addEventListener('click', () => apiModal.classList.remove('hidden'));
+btnCloseModal.addEventListener('click', () => apiModal.classList.add('hidden'));
+apiModal.addEventListener('click', (e) => {
+  if (e.target === apiModal) apiModal.classList.add('hidden');
+});
+
+btnSaveApiKey.addEventListener('click', () => {
+  const key = rapidApiKeyInput.value.trim();
+  localStorage.setItem('sorteador_rapidapi_key', key);
+  apiModal.classList.add('hidden');
+  if (key) {
+    showStatusMessage('✅ Chave da API configurada com sucesso!', 'success');
+  } else {
+    showStatusMessage('Chave da API removida. Usando modo de importação por arquivo.', 'info');
+  }
+});
+
+// ==========================================
+// MÉTODO 1: BUSCAR COMENTÁRIOS PELO LINK
 // ==========================================
 btnFetchComments.addEventListener('click', async () => {
   const url = postUrlInput.value.trim();
@@ -123,52 +161,58 @@ btnFetchComments.addEventListener('click', async () => {
     return;
   }
 
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    showStatusMessage('Insira um link válido (começando com https://).', 'error');
-    return;
-  }
+  const apiKey = localStorage.getItem('sorteador_rapidapi_key');
 
-  // Loading UI
-  btnFetchText.textContent = 'Buscando comentários...';
+  btnFetchText.textContent = 'Buscando...';
   fetchSpinner.classList.remove('hidden');
   btnFetchComments.disabled = true;
-  showStatusMessage('Conectando à publicação para extrair comentários...', 'info');
 
-  try {
-    // Note: Due to Meta's strict anti-bot and CORS protection on public static sites,
-    // direct unauthenticated browser scraping is blocked by Meta.
-    // Here we provide a transparent bridge with a fallback:
-    await new Promise(resolve => setTimeout(resolve, 1800));
+  // Se o usuário configurou uma chave RapidAPI
+  if (apiKey) {
+    showStatusMessage('Consultando comentários via API...', 'info');
+    try {
+      // Extrai o shortcode do Instagram (ex: /p/C-xyz123/)
+      const match = url.match(/(?:p|reel)\/([A-Za-z0-9_-]+)/);
+      const shortcode = match ? match[1] : '';
 
-    // Exemplos de demonstração caso esteja testando ou link público
-    const demoComments = [
-      "@marcos_silva Parabéns pelo sorteio! Já quero ganhar 🚀 @amigo1 @amigo2",
-      "@carla.dias Participando com certeza! @fernanda_reis",
-      "@lucas_souza Eu vou levar esse prêmio @pedro_lima",
-      "@juliana.costa Que sorteio top! @amiga_fit @mariah",
-      "@rodrigo.tech Já estou torcendo aqui! @dev_brasil",
-      "@aline_santos Marcando meus amigos: @bia_lima @jorge",
-      "@felipe.gomes Me escolhe! @irmao_gomes",
-      "@patricia_mendes Torcendo muito por aqui! @prima_paula"
-    ];
+      const response = await fetch(`https://instagram-scraper-api2.p.rapidapi.com/v1/comments?code_or_id_or_url=${encodeURIComponent(shortcode || url)}`, {
+        method: 'GET',
+        headers: {
+          'x-rapidapi-key': apiKey,
+          'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com'
+        }
+      });
 
-    // Se o usuário colou um link, informamos com transparência e preenchemos
-    namesInput.value = demoComments.join('\n');
-    updateCount();
+      const data = await response.json();
+      const comments = data?.data?.items || data?.items || [];
 
-    showStatusMessage(
-      '✅ 8 comentários sincronizados com sucesso da publicação! Você pode adicionar ou ajustar abaixo antes do sorteio.',
-      'success'
-    );
-  } catch (err) {
-    showStatusMessage(
-      'A Meta exigiu autenticação para esta postagem. Você pode colar a lista de comentários diretamente no campo abaixo.',
-      'error'
-    );
-  } finally {
-    btnFetchText.textContent = 'Carregar Comentários';
-    fetchSpinner.classList.add('hidden');
-    btnFetchComments.disabled = false;
+      if (comments && comments.length > 0) {
+        const parsed = comments.map(c => `@${c.user?.username || c.owner?.username || 'usuario'} - ${c.text || ''}`);
+        namesInput.value = parsed.join('\n');
+        updateCount();
+        showStatusMessage(`✅ ${comments.length} comentários reais importados com sucesso pelo link!`, 'success');
+      } else {
+        throw new Error('Nenhum comentário retornado pela API ou publicação privada.');
+      }
+    } catch (err) {
+      showStatusMessage(`Falha na API: ${err.message}. Tente usar o Método 2 (Importar Arquivo .CSV/.TXT) abaixo.`, 'error');
+    } finally {
+      btnFetchText.textContent = 'Carregar pelo Link';
+      fetchSpinner.classList.add('hidden');
+      btnFetchComments.disabled = false;
+    }
+  } else {
+    // Sem chave de API cadastrada: orienta o usuário com transparência
+    setTimeout(() => {
+      btnFetchText.textContent = 'Carregar pelo Link';
+      fetchSpinner.classList.add('hidden');
+      btnFetchComments.disabled = false;
+
+      showStatusMessage(
+        '💡 Dica: A Meta bloqueia leitura direta sem autenticação. Para buscar pelo link, clique em "⚙️ API" e adicione uma chave gratuita da RapidAPI, OU use o Método 2 abaixo arrastando o arquivo de comentários!',
+        'info'
+      );
+    }, 600);
   }
 });
 
@@ -178,7 +222,106 @@ function showStatusMessage(msg, type) {
   fetchStatusMsg.classList.remove('hidden');
 }
 
-// Update lines count in real time
+// ==========================================
+// MÉTODO 2: IMPORTADOR DE ARQUIVO (.CSV, .TXT)
+// ==========================================
+triggerFileSelect.addEventListener('click', (e) => {
+  e.stopPropagation();
+  fileInput.click();
+});
+dropZone.addEventListener('click', () => fileInput.click());
+
+['dragenter', 'dragover'].forEach(eventName => {
+  dropZone.addEventListener(eventName, (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+  dropZone.addEventListener(eventName, (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+  });
+});
+
+dropZone.addEventListener('drop', (e) => {
+  const dt = e.dataTransfer;
+  const files = dt.files;
+  if (files && files.length > 0) {
+    handleFileUpload(files[0]);
+  }
+});
+
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files && e.target.files.length > 0) {
+    handleFileUpload(e.target.files[0]);
+  }
+});
+
+function handleFileUpload(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const content = e.target.result;
+    parseAndLoadFile(content, file.name);
+  };
+  reader.readAsText(file);
+}
+
+function parseAndLoadFile(content, fileName) {
+  const lines = content.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+  if (lines.length === 0) {
+    alert('O arquivo selecionado está vazio!');
+    return;
+  }
+
+  let parsedComments = [];
+
+  // Verifica se é um CSV com cabeçalho (ex: Username, Comment, etc.)
+  const firstLine = lines[0].toLowerCase();
+  const isCsv = fileName.endsWith('.csv') || firstLine.includes(',') || firstLine.includes(';');
+  const delimiter = firstLine.includes(';') ? ';' : ',';
+
+  if (isCsv) {
+    const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase().replace(/"/g, ''));
+    let userColIdx = headers.findIndex(h => h.includes('user') || h.includes('perfil') || h.includes('autor') || h.includes('nome'));
+    let commentColIdx = headers.findIndex(h => h.includes('comment') || h.includes('coment') || h.includes('text') || h.includes('mensagem'));
+
+    // Se encontrou cabeçalho conhecido, pula a linha 1
+    const startIndex = (userColIdx !== -1 || commentColIdx !== -1) ? 1 : 0;
+    if (userColIdx === -1) userColIdx = 0; // fallback para primeira coluna
+
+    for (let i = startIndex; i < lines.length; i++) {
+      const parts = lines[i].split(delimiter).map(p => p.trim().replace(/^"|"$/g, ''));
+      if (parts.length > userColIdx) {
+        let user = parts[userColIdx] || '';
+        if (user && !user.startsWith('@')) user = '@' + user;
+        let comm = commentColIdx !== -1 && parts[commentColIdx] ? ` - ${parts[commentColIdx]}` : '';
+        parsedComments.push(`${user}${comm}`);
+      }
+    }
+  } else {
+    // Arquivo de texto puro (.txt): 1 por linha
+    parsedComments = lines;
+  }
+
+  if (parsedComments.length > 0) {
+    namesInput.value = parsedComments.join('\n');
+    updateCount();
+    showStatusMessage(`📁 Arquivo "${fileName}" carregado com sucesso! ${parsedComments.length} participantes prontos.`, 'success');
+  }
+}
+
+// Botão Limpar
+btnClearNames.addEventListener('click', () => {
+  if (namesInput.value.trim() && confirm('Deseja limpar todos os participantes da lista?')) {
+    namesInput.value = '';
+    updateCount();
+    fetchStatusMsg.classList.add('hidden');
+  }
+});
+
+// Update lines count
 namesInput.addEventListener('input', updateCount);
 
 function updateCount() {
@@ -196,17 +339,17 @@ function getCleanNamesList() {
 }
 
 // ==========================================
-// DRAW LOGIC - NAMES / COMMENTS
+// SORTEIO: NOMES / COMENTÁRIOS
 // ==========================================
 btnDrawNames.addEventListener('click', () => {
   let list = getCleanNamesList();
 
   if (list.length === 0) {
-    alert('Por favor, carregue os comentários pelo link ou cole a lista de participantes!');
+    alert('Por favor, carregue os comentários pelo link, importe um arquivo ou cole os participantes!');
     return;
   }
 
-  // Filter 1: Require @
+  // Regra: Exigir @
   const requireMention = document.getElementById('opt-require-mention').checked;
   if (requireMention) {
     list = list.filter(item => /@\w+/.test(item));
@@ -216,10 +359,9 @@ btnDrawNames.addEventListener('click', () => {
     }
   }
 
-  // Filter 2: Deduplication (1 chance per user profile)
+  // Regra: Remover Duplicados (1 chance por perfil)
   const removeDuplicates = document.getElementById('opt-remove-duplicates').checked;
   if (removeDuplicates) {
-    // If it starts with @user, dedup by user handle
     const seenUsers = new Set();
     const dedupedList = [];
 
@@ -245,19 +387,19 @@ btnDrawNames.addEventListener('click', () => {
     return;
   }
 
-  // Shuffle and Pick
+  // Animação e Sorteio
   runDrawAnimation(list, () => {
     const pool = [...list];
     const winners = [];
     const substitutes = [];
 
-    // Draw Winners
+    // Ganhadores Titulares
     for (let i = 0; i < winnersCount; i++) {
       const idx = getRandomIndex(pool.length);
       winners.push(pool.splice(idx, 1)[0]);
     }
 
-    // Draw Substitutes
+    // Ganhadores Substitutos
     for (let i = 0; i < substitutesCount; i++) {
       const idx = getRandomIndex(pool.length);
       substitutes.push(pool.splice(idx, 1)[0]);
@@ -268,7 +410,7 @@ btnDrawNames.addEventListener('click', () => {
 });
 
 // ==========================================
-// DRAW LOGIC - NUMBERS
+// SORTEIO: NÚMEROS
 // ==========================================
 btnDrawNumbers.addEventListener('click', () => {
   const min = parseInt(document.getElementById('num-min').value);
@@ -309,7 +451,7 @@ btnDrawNumbers.addEventListener('click', () => {
 });
 
 // ==========================================
-// ANIMATION & SUSPENSE
+// ANIMAÇÃO DE ROLETA
 // ==========================================
 function runDrawAnimation(sampleItems, onFinish) {
   tabContents.forEach(c => c.classList.remove('active'));
@@ -339,13 +481,13 @@ function runDrawAnimation(sampleItems, onFinish) {
 }
 
 // ==========================================
-// SHOW RESULTS & CELEBRATION
+// RESULTADOS & COMEMORAÇÃO
 // ==========================================
 function showResults(winners, substitutes) {
   resultBox.classList.remove('hidden');
   resultTimestamp.textContent = `Realizado em: ${new Date().toLocaleString('pt-BR')}`;
 
-  // Render Winners
+  // Ganhadores Titulares
   winnersList.innerHTML = '';
   winners.forEach((winner, index) => {
     const item = document.createElement('div');
@@ -358,7 +500,7 @@ function showResults(winners, substitutes) {
     winnersList.appendChild(item);
   });
 
-  // Render Substitutes
+  // Ganhadores Substitutos
   if (substitutes && substitutes.length > 0) {
     substitutesSection.classList.remove('hidden');
     substitutesList.innerHTML = '';
@@ -375,37 +517,23 @@ function showResults(winners, substitutes) {
     substitutesSection.classList.add('hidden');
   }
 
-  // Audio & Confetti
+  // Som e Confetes
   playWinSound();
   launchConfetti();
 }
 
 function launchConfetti() {
   if (typeof confetti === 'function') {
-    confetti({
-      particleCount: 90,
-      spread: 70,
-      origin: { y: 0.6 }
-    });
+    confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
     setTimeout(() => {
-      confetti({
-        particleCount: 50,
-        angle: 60,
-        spread: 55,
-        origin: { x: 0 }
-      });
-      confetti({
-        particleCount: 50,
-        angle: 120,
-        spread: 55,
-        origin: { x: 1 }
-      });
+      confetti({ particleCount: 50, angle: 60, spread: 55, origin: { x: 0 } });
+      confetti({ particleCount: 50, angle: 120, spread: 55, origin: { x: 1 } });
     }, 250);
   }
 }
 
 // ==========================================
-// COPY & RESET
+// COPIAR RESULTADO & RESET
 // ==========================================
 btnCopyResult.addEventListener('click', () => {
   const dateStr = resultTimestamp.textContent;

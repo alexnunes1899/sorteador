@@ -45,11 +45,14 @@
       <!-- TAB 1: Sorteio Redes Sociais -->
       <section id="tab-social" class="tab-content active">
         
-        <!-- Link Input Box -->
+        <!-- Método 1: Por Link -->
         <div class="link-fetch-card">
           <div class="link-header">
-            <label for="post-url">🔗 Cole o link da publicação oficial:</label>
-            <span class="network-badge" id="detected-network">Aguardando link...</span>
+            <label for="post-url">🔗 Método 1: Cole o link do Post</label>
+            <div class="header-actions">
+              <span class="network-badge" id="detected-network">Aguardando link...</span>
+              <button id="btn-open-api-modal" class="btn-api-settings" title="Configurar chave de API para busca direta">⚙️ API</button>
+            </div>
           </div>
           <div class="input-with-button">
             <input 
@@ -60,21 +63,41 @@
             >
             <button id="btn-fetch-comments" class="btn-fetch">
               <span class="btn-spinner hidden" id="fetch-spinner"></span>
-              <span id="btn-fetch-text">Carregar Comentários</span>
+              <span id="btn-fetch-text">Carregar pelo Link</span>
             </button>
           </div>
           <div id="fetch-status-msg" class="fetch-status-msg hidden"></div>
         </div>
 
+        <!-- Divisor OU -->
+        <div class="or-divider">
+          <span>OU</span>
+        </div>
+
+        <!-- Método 2: Importar Arquivo -->
+        <div class="file-import-card" id="drop-zone">
+          <input type="file" id="file-input" accept=".csv, .txt, .tsv, .json" class="hidden-file-input">
+          <div class="import-content">
+            <span class="upload-icon">📁</span>
+            <div class="upload-text">
+              <strong>Método 2: Importar arquivo de comentários</strong>
+              <p>Arraste seu arquivo <code>.csv</code> ou <code>.txt</code> aqui ou <span class="highlight-link" id="trigger-file-select">clique para selecionar</span></p>
+            </div>
+          </div>
+        </div>
+
         <!-- Participants Area -->
         <div class="form-group" style="margin-top: 20px;">
           <div class="label-row">
-            <label for="names-input">Comentários carregados / Participantes:</label>
-            <span class="counter-badge" id="lines-count">0 participantes</span>
+            <label for="names-input">Lista de Comentários / Participantes:</label>
+            <div class="badge-actions">
+              <button id="btn-clear-names" class="btn-clear" title="Limpar lista">🗑️ Limpar</button>
+              <span class="counter-badge" id="lines-count">0 participantes</span>
+            </div>
           </div>
           <textarea 
             id="names-input" 
-            placeholder="Os comentários aparecerão aqui automaticamente após carregar o link acima. Você também pode colar ou editar os nomes manualmente se preferir."
+            placeholder="Os comentários carregados pelo link ou pelo arquivo aparecerão aqui. Você também pode colar diretamente se desejar."
           ></textarea>
         </div>
 
@@ -193,6 +216,27 @@
       </div>
 
     </main>
+
+    <!-- Modal de Configuração de API (Opcional) -->
+    <div id="api-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>⚙️ Conectar API de Scraping</h3>
+          <button id="btn-close-modal" class="btn-close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p>Para buscar comentários pelo link sem passar por bloqueios da Meta, você pode conectar uma chave gratuita da <strong>RapidAPI</strong> (ex: Instagram Scraper API).</p>
+          <div class="form-group" style="margin-top: 14px;">
+            <label for="rapidapi-key">Sua RapidAPI Key (opcional):</label>
+            <input type="text" id="rapidapi-key" placeholder="Ex: 8f92b7c4a1msh... (fica salva apenas no seu navegador)">
+          </div>
+          <small class="hint">Deixe em branco para usar o importador de arquivo .csv/.txt sem precisar de chave.</small>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-save-api-key" class="btn-primary" style="padding: 10px 18px; font-size: 0.9rem;">Salvar Chave</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">

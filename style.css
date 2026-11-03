@@ -163,7 +163,7 @@ body {
   border: 1px solid rgba(99, 102, 241, 0.3);
   border-radius: 14px;
   padding: 18px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .link-header {
@@ -171,6 +171,28 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-api-settings {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-card);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-api-settings:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .network-badge {
@@ -254,6 +276,7 @@ body {
   font-size: 0.85rem;
   padding: 8px 12px;
   border-radius: 8px;
+  line-height: 1.4;
 }
 .fetch-status-msg.info {
   background: rgba(56, 189, 248, 0.1);
@@ -269,6 +292,99 @@ body {
   background: rgba(239, 68, 68, 0.1);
   color: #f87171;
   border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* Or Divider */
+.or-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 14px 0;
+  position: relative;
+}
+.or-divider::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.or-divider span {
+  background: #1e293b;
+  position: relative;
+  z-index: 1;
+  padding: 2px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  border: 1px solid var(--border-card);
+}
+
+/* File Import Card */
+.file-import-card {
+  background: rgba(15, 23, 42, 0.5);
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+.file-import-card:hover, .file-import-card.dragover {
+  border-color: var(--primary);
+  background: rgba(99, 102, 241, 0.08);
+}
+.hidden-file-input {
+  display: none;
+}
+.import-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.upload-icon {
+  font-size: 2rem;
+}
+.upload-text {
+  text-align: left;
+}
+.upload-text strong {
+  display: block;
+  font-size: 0.95rem;
+  color: #fff;
+}
+.upload-text p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.highlight-link {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* Badge Actions */
+.badge-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-clear {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+.btn-clear:hover {
+  color: #ef4444;
 }
 
 /* Form Styles */
@@ -301,7 +417,7 @@ label {
 
 textarea {
   width: 100%;
-  height: 130px;
+  height: 125px;
   background: rgba(15, 23, 42, 0.8);
   border: 1px solid var(--border-card);
   border-radius: 12px;
@@ -656,6 +772,65 @@ textarea:focus {
   border-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-card {
+  background: #1e293b;
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
+  max-width: 480px;
+  width: 100%;
+  padding: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.modal-header h3 {
+  font-size: 1.15rem;
+  color: #fff;
+}
+.btn-close-modal {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.modal-body p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.modal-body input {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #fff;
+  outline: none;
+  margin-top: 6px;
+}
+.modal-footer {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 .hidden {
   display: none !important;
 }
@@ -687,5 +862,12 @@ textarea:focus {
   }
   .input-with-button {
     flex-direction: column;
+  }
+  .import-content {
+    flex-direction: column;
+    text-align: center;
+  }
+  .upload-text {
+    text-align: center;
   }
 }
