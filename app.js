@@ -1,4 +1,10 @@
 // ==========================================
+// CONFIGURAÇÃO INTEGRADA DA API
+// ==========================================
+const DEFAULT_RAPIDAPI_KEY = '33f3227ee8msh6818ae7d446c656p1a527ejsn067883af0870';
+const RAPIDAPI_HOST = 'instagram-scraper-api2.p.rapidapi.com';
+
+// ==========================================
 // AUDIO SYNTHESIZER (Lazy Web Audio API)
 // ==========================================
 let audioCtx = null;
@@ -84,7 +90,6 @@ function getRandomIndex(max) {
     } while (val >= limit);
     return val % max;
   }
-  // Fallback for huge ranges (> 4 billion) using 53-bit float from crypto
   const pair = new Uint32Array(2);
   window.crypto.getRandomValues(pair);
   const random53 = (pair[0] * 0x200000 + (pair[1] >>> 11)) / 0x20000000000000;
@@ -97,32 +102,37 @@ function getRandomIndex(max) {
 const tabBtns = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
-// Link & API Elements
+// Aba 1: Por Link
 const postUrlInput = document.getElementById('post-url');
 const detectedNetworkBadge = document.getElementById('detected-network');
 const btnFetchComments = document.getElementById('btn-fetch-comments');
 const btnFetchText = document.getElementById('btn-fetch-text');
 const fetchSpinner = document.getElementById('fetch-spinner');
 const fetchStatusMsg = document.getElementById('fetch-status-msg');
-const btnOpenApiModal = document.getElementById('btn-open-api-modal');
-const apiModal = document.getElementById('api-modal');
-const btnCloseModal = document.getElementById('btn-close-modal');
-const btnSaveApiKey = document.getElementById('btn-save-api-key');
-const rapidApiKeyInput = document.getElementById('rapidapi-key');
+const linkPreviewBox = document.getElementById('link-preview-box');
+const linkCommentsInput = document.getElementById('link-comments-input');
+const linkLinesCountBadge = document.getElementById('link-lines-count');
+const linkWinnersCountInput = document.getElementById('link-winners-count');
+const linkSubstitutesCountInput = document.getElementById('link-substitutes-count');
+const linkRemoveDuplicates = document.getElementById('link-remove-duplicates');
+const linkRequireMention = document.getElementById('link-require-mention');
+const btnDrawLink = document.getElementById('btn-draw-link');
 
-// File Import Elements
+// Aba 2: Planilha / Lista
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 const triggerFileSelect = document.getElementById('trigger-file-select');
-
-// Names, Filters & Results
+const sheetStatusMsg = document.getElementById('sheet-status-msg');
 const namesInput = document.getElementById('names-input');
 const linesCountBadge = document.getElementById('lines-count');
 const btnClearNames = document.getElementById('btn-clear-names');
+const sheetWinnersCountInput = document.getElementById('sheet-winners-count');
+const sheetSubstitutesCountInput = document.getElementById('sheet-substitutes-count');
 const optRemoveDuplicates = document.getElementById('opt-remove-duplicates');
 const optRequireMention = document.getElementById('opt-require-mention');
+const btnDrawSheet = document.getElementById('btn-draw-sheet');
 
-const btnDrawNames = document.getElementById('btn-draw-names');
+// Aba 3: Números & Resultados
 const btnDrawNumbers = document.getElementById('btn-draw-numbers');
 const animationBox = document.getElementById('animation-box');
 const rouletteDisplay = document.getElementById('roulette-display');
@@ -135,30 +145,11 @@ const resultTimestamp = document.getElementById('result-timestamp');
 const btnCopyResult = document.getElementById('btn-copy-result');
 const btnNewDraw = document.getElementById('btn-new-draw');
 
+let lastFetchedUrl = '';
+let isFetchingLink = false;
 let activeDrawTimer = null;
 let copyFeedbackTimeout = null;
 const COPY_BTN_DEFAULT_TEXT = '📋 Copiar Resultado Formatado';
-
-// Initialize API Key from LocalStorage
-function syncApiButtonState() {
-  let savedKey = '';
-  try {
-    savedKey = localStorage.getItem('sorteador_rapidapi_key') || '';
-  } catch (e) {
-    savedKey = '';
-  }
-  if (rapidApiKeyInput) rapidApiKeyInput.value = savedKey;
-  if (btnOpenApiModal) {
-    if (savedKey) {
-      btnOpenApiModal.textContent = '⚙️ API ✓';
-      btnOpenApiModal.classList.add('configured');
-    } else {
-      btnOpenApiModal.textContent = '⚙️ API';
-      btnOpenApiModal.classList.remove('configured');
-    }
-  }
-}
-syncApiButtonState();
 
 // Tab Switching
 tabBtns.forEach(btn => {
@@ -176,7 +167,15 @@ tabBtns.forEach(btn => {
   });
 });
 
-// Detect Social Network from Link
+function showStatusMessage(targetEl, msg, type) {
+  targetEl.textContent = msg;
+  targetEl.className = `fetch-status-msg ${type}`;
+  targetEl.classList.remove('hidden');
+}
+
+// ==========================================
+// ABA 1: SORTEIO DIRETO PELO LINK
+// ==========================================
 postUrlInput.addEventListener('input', () => {
   const url = postUrlInput.value.trim().toLowerCase();
   detectedNetworkBadge.className = 'network-badge';
@@ -204,103 +203,50 @@ postUrlInput.addEventListener('keydown', (e) => {
   }
 });
 
-// ==========================================
-// API MODAL CONTROLS
-// ==========================================
-btnOpenApiModal.addEventListener('click', () => {
-  apiModal.classList.remove('hidden');
-  rapidApiKeyInput.focus();
-});
-
-btnCloseModal.addEventListener('click', () => apiModal.classList.add('hidden'));
-
-apiModal.addEventListener('click', (e) => {
-  if (e.target === apiModal) apiModal.classList.add('hidden');
-});
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !apiModal.classList.contains('hidden')) {
-    apiModal.classList.add('hidden');
-  }
-});
-
-btnSaveApiKey.addEventListener('click', () => {
-  const key = rapidApiKeyInput.value.trim();
-  try {
-    localStorage.setItem('sorteador_rapidapi_key', key);
-  } catch (e) {
-    // Ignore storage quota / private mode errors
-  }
-  syncApiButtonState();
-  apiModal.classList.add('hidden');
-  if (key) {
-    showStatusMessage('✅ Chave da API salva com sucesso! Cole um link do Instagram e clique em "Carregar pelo Link".', 'success');
-  } else {
-    showStatusMessage('Chave da API removida. Usando modo gratuito de importação por arquivo.', 'info');
-  }
-});
-
-// ==========================================
-// MÉTODO 1: BUSCAR COMENTÁRIOS PELO LINK
-// ==========================================
 function extractInstagramShortcode(url) {
   const match = url.match(/(?:instagram\.com|instagr\.am)\/(?:[^/?#]+\/)?(?:p|reels?|tv)\/([A-Za-z0-9_-]+)/i);
   return match ? match[1] : '';
 }
 
-btnFetchComments.addEventListener('click', async () => {
-  const url = postUrlInput.value.trim();
-
+async function fetchCommentsFromUrl(url) {
   if (!url) {
-    showStatusMessage('Por favor, cole o link da publicação do Instagram ou Facebook.', 'error');
-    return;
+    showStatusMessage(fetchStatusMsg, 'Por favor, cole o link da publicação do Instagram.', 'error');
+    return false;
   }
 
   if (!/^https?:\/\//i.test(url)) {
-    showStatusMessage('Insira um link completo começando com https://', 'error');
-    return;
+    showStatusMessage(fetchStatusMsg, 'Insira um link completo começando com https://', 'error');
+    return false;
   }
 
   const lowerUrl = url.toLowerCase();
-  const isFacebook = lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.watch') || lowerUrl.includes('fb.com');
-
-  let apiKey = '';
-  try {
-    apiKey = localStorage.getItem('sorteador_rapidapi_key') || '';
-  } catch (e) {
-    apiKey = '';
-  }
-
-  if (isFacebook) {
+  if (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.watch') || lowerUrl.includes('fb.com')) {
     showStatusMessage(
-      '📘 Para publicações do Facebook, a Meta restringe acesso externo por link. Exporte os comentários em .csv/.txt e arraste no Método 2 abaixo, ou cole diretamente na lista!',
+      fetchStatusMsg,
+      '📘 Para posts do Facebook, a Meta restringe acesso externo por link. Use a aba "📊 Planilha / Lista" ao lado para importar os comentários!',
       'info'
     );
-    return;
+    return false;
   }
 
-  if (!apiKey) {
-    showStatusMessage(
-      '💡 A Meta bloqueia leitura direta sem autenticação. Clique em "⚙️ API" acima para conectar uma chave gratuita da RapidAPI, OU use o Método 2 abaixo arrastando seu arquivo (.csv, .txt, .json)!',
-      'info'
-    );
-    return;
-  }
+  if (isFetchingLink) return false;
+  isFetchingLink = true;
 
   btnFetchText.textContent = 'Buscando...';
   fetchSpinner.classList.remove('hidden');
   btnFetchComments.disabled = true;
-  showStatusMessage('Consultando comentários do Instagram via API...', 'info');
+  btnDrawLink.disabled = true;
+  showStatusMessage(fetchStatusMsg, 'Carregando comentários da publicação no Instagram...', 'info');
 
   try {
     const shortcode = extractInstagramShortcode(url);
     const queryTarget = shortcode || url;
-    let allComments = [];
+    const allComments = [];
     let paginationToken = null;
     const maxPages = 5;
 
     for (let page = 0; page < maxPages; page++) {
-      let endpoint = `https://instagram-scraper-api2.p.rapidapi.com/v1/comments?code_or_id_or_url=${encodeURIComponent(queryTarget)}`;
+      let endpoint = `https://${RAPIDAPI_HOST}/v1/comments?code_or_id_or_url=${encodeURIComponent(queryTarget)}`;
       if (paginationToken) {
         endpoint += `&pagination_token=${encodeURIComponent(paginationToken)}`;
       }
@@ -308,19 +254,19 @@ btnFetchComments.addEventListener('click', async () => {
       const response = await fetch(endpoint, {
         method: 'GET',
         headers: {
-          'x-rapidapi-key': apiKey,
-          'x-rapidapi-host': 'instagram-scraper-api2.p.rapidapi.com'
+          'x-rapidapi-key': DEFAULT_RAPIDAPI_KEY,
+          'x-rapidapi-host': RAPIDAPI_HOST
         }
       });
 
       if (response.status === 401 || response.status === 403) {
-        throw new Error('Chave RapidAPI inválida ou não inscrita no serviço "Instagram Scraper API2".');
+        throw new Error('Falta ativar o plano gratuito (Subscribe) na página da API Instagram Scraper API2 na RapidAPI.');
       }
       if (response.status === 429) {
-        throw new Error('Limite de requisições da sua conta RapidAPI foi atingido.');
+        throw new Error('Limite gratuito de buscas da API atingido neste momento. Use a aba "📊 Planilha / Lista" sem limites!');
       }
       if (!response.ok) {
-        throw new Error(`Erro HTTP ${response.status} ao consultar a API.`);
+        throw new Error(`Não foi possível consultar esta publicação (HTTP ${response.status}).`);
       }
 
       const data = await response.json();
@@ -328,7 +274,7 @@ btnFetchComments.addEventListener('click', async () => {
 
       if (Array.isArray(pageItems) && pageItems.length > 0) {
         allComments.push(...pageItems);
-        showStatusMessage(`Buscando comentários... (${allComments.length} carregados)`, 'info');
+        showStatusMessage(fetchStatusMsg, `Buscando comentários... (${allComments.length} carregados)`, 'info');
       }
 
       paginationToken = data?.pagination_token || data?.data?.pagination_token || null;
@@ -343,29 +289,69 @@ btnFetchComments.addEventListener('click', async () => {
         ))
         .filter(Boolean);
 
-      namesInput.value = parsed.join('\n');
-      updateCount();
-      showStatusMessage(`✅ ${parsed.length} comentários reais importados com sucesso pelo link!`, 'success');
+      linkCommentsInput.value = parsed.join('\n');
+      lastFetchedUrl = url;
+      linkPreviewBox.classList.remove('hidden');
+      updateLinkCount();
+      showStatusMessage(fetchStatusMsg, `✅ ${parsed.length} comentário(s) carregado(s) com sucesso! Pronto para sortear.`, 'success');
+      return true;
     } else {
       throw new Error('Nenhum comentário encontrado ou a publicação é privada.');
     }
   } catch (err) {
-    showStatusMessage(`⚠️ ${err.message} Você pode usar o Método 2 (Importar Arquivo) abaixo sem limites.`, 'error');
+    showStatusMessage(fetchStatusMsg, `⚠️ ${err.message}`, 'error');
+    return false;
   } finally {
-    btnFetchText.textContent = 'Carregar pelo Link';
+    isFetchingLink = false;
+    btnFetchText.textContent = 'Carregar Comentários';
     fetchSpinner.classList.add('hidden');
     btnFetchComments.disabled = false;
+    btnDrawLink.disabled = false;
   }
-});
-
-function showStatusMessage(msg, type) {
-  fetchStatusMsg.textContent = msg;
-  fetchStatusMsg.className = `fetch-status-msg ${type}`;
-  fetchStatusMsg.classList.remove('hidden');
 }
 
+btnFetchComments.addEventListener('click', () => {
+  fetchCommentsFromUrl(postUrlInput.value.trim());
+});
+
+btnDrawLink.addEventListener('click', async () => {
+  const url = postUrlInput.value.trim();
+
+  if (!url && !linkCommentsInput.value.trim()) {
+    showStatusMessage(fetchStatusMsg, 'Por favor, cole o link da publicação do Instagram primeiro!', 'error');
+    postUrlInput.focus();
+    return;
+  }
+
+  // Se o usuário só colou o link e clicou direto em REALIZAR SORTEIO, busca os comentários automaticamente!
+  if (url && (url !== lastFetchedUrl || !linkCommentsInput.value.trim())) {
+    const ok = await fetchCommentsFromUrl(url);
+    if (!ok) return;
+  }
+
+  executeParticipantsDraw({
+    rawText: linkCommentsInput.value,
+    removeDuplicates: linkRemoveDuplicates.checked,
+    requireMention: linkRequireMention.checked,
+    winnersCount: parseInt(linkWinnersCountInput.value, 10),
+    substitutesCount: parseInt(linkSubstitutesCountInput.value, 10)
+  });
+});
+
+function updateLinkCount() {
+  const { rawCount, validItems } = getFilteredParticipantsFromText(
+    linkCommentsInput.value,
+    linkRemoveDuplicates.checked,
+    linkRequireMention.checked
+  );
+  updateBadgeElement(linkLinesCountBadge, rawCount, validItems.length);
+}
+
+linkRemoveDuplicates.addEventListener('change', updateLinkCount);
+linkRequireMention.addEventListener('change', updateLinkCount);
+
 // ==========================================
-// MÉTODO 2: IMPORTADOR MULTI-FORMATO (.CSV, .TSV, .JSON, .TXT)
+// ABA 2: IMPORTADOR DE PLANILHAS (.XLSX, .XLS, .CSV, .TSV, .JSON, .TXT)
 // ==========================================
 triggerFileSelect.addEventListener('click', (e) => {
   e.stopPropagation();
@@ -405,7 +391,6 @@ dropZone.addEventListener('drop', (e) => {
 fileInput.addEventListener('change', (e) => {
   if (e.target.files && e.target.files.length > 0) {
     handleFileUpload(e.target.files[0]);
-    // Reset input so selecting the exact same file again triggers 'change'
     fileInput.value = '';
   }
 });
@@ -414,21 +399,69 @@ function decodeFileBuffer(buffer) {
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
   } catch (e) {
-    // Fallback for Brazilian Excel ANSI / Windows-1252 CSV files
     return new TextDecoder('windows-1252').decode(buffer);
   }
 }
 
 function handleFileUpload(file) {
+  const lowerName = file.name.toLowerCase();
+  const isExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls');
+
   const reader = new FileReader();
   reader.onload = (e) => {
-    const content = decodeFileBuffer(e.target.result);
-    parseAndLoadFile(content, file.name);
+    const buffer = e.target.result;
+    if (isExcel) {
+      parseAndLoadExcelBuffer(buffer, file.name);
+    } else {
+      const content = decodeFileBuffer(buffer);
+      parseAndLoadFile(content, file.name);
+    }
   };
   reader.onerror = () => {
-    showStatusMessage('Erro ao ler o arquivo selecionado.', 'error');
+    showStatusMessage(sheetStatusMsg, 'Erro ao ler o arquivo selecionado.', 'error');
   };
   reader.readAsArrayBuffer(file);
+}
+
+function parseAndLoadExcelBuffer(buffer, fileName) {
+  if (typeof XLSX === 'undefined') {
+    showStatusMessage(
+      sheetStatusMsg,
+      'A biblioteca de Excel ainda está carregando. Aguarde 1 segundo e tente novamente ou salve como .csv!',
+      'error'
+    );
+    return;
+  }
+
+  try {
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) {
+      showStatusMessage(sheetStatusMsg, 'A planilha selecionada não possui abas.', 'error');
+      return;
+    }
+
+    const sheet = workbook.Sheets[firstSheetName];
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    const cleanRows = rawRows
+      .map(row => row.map(cell => String(cell ?? '').trim()))
+      .filter(row => row.some(cell => cell.length > 0));
+
+    const parsedComments = extractParticipantsFromRows(cleanRows);
+    if (parsedComments.length > 0) {
+      namesInput.value = parsedComments.join('\n');
+      updateSheetCount();
+      showStatusMessage(
+        sheetStatusMsg,
+        `📊 Planilha "${fileName}" importada com sucesso! ${parsedComments.length} participante(s) carregado(s).`,
+        'success'
+      );
+    } else {
+      showStatusMessage(sheetStatusMsg, `Nenhum participante encontrado na planilha "${fileName}".`, 'error');
+    }
+  } catch (err) {
+    showStatusMessage(sheetStatusMsg, `Erro ao ler a planilha Excel "${fileName}". Verifique se o arquivo é válido.`, 'error');
+  }
 }
 
 function formatParticipantRecord(rawUser, rawComment) {
@@ -438,7 +471,6 @@ function formatParticipantRecord(rawUser, rawComment) {
   if (!cleanUser && !cleanComment) return '';
   if (!cleanUser) return cleanComment;
 
-  // Format Instagram-style handles with '@' if single token without spaces
   const formattedUser = (!cleanUser.startsWith('@') && /^[a-zA-Z0-9_.]+$/.test(cleanUser))
     ? `@${cleanUser}`
     : cleanUser;
@@ -461,7 +493,7 @@ function detectCsvColumns(rawHeaders) {
   const exactUserNames = [
     'username', 'owner_username', 'ownerusername', 'user_name',
     'handle', 'instagram', 'arroba', 'usuario', 'autor', 'author',
-    'from', 'user', 'nome', 'name', 'perfil', 'profile_name'
+    'from', 'user', 'nome', 'name', 'perfil', 'profile_name', 'participante'
   ];
   const exactCommentNames = [
     'text', 'comment', 'comment_text', 'commenttext', 'comentario',
@@ -478,7 +510,7 @@ function detectCsvColumns(rawHeaders) {
   }
   if (userColIdx === -1) {
     userColIdx = headers.findIndex(h =>
-      (h.includes('username') || h.includes('usuario') || h.includes('autor') || h.includes('author') || h.includes('nome')) &&
+      (h.includes('username') || h.includes('usuario') || h.includes('autor') || h.includes('author') || h.includes('nome') || h.includes('participante')) &&
       !/\b(id|url|link|pic|photo|avatar|count|verified)\b/.test(h) &&
       !h.endsWith('id') && !h.endsWith('url')
     );
@@ -504,11 +536,36 @@ function detectCsvColumns(rawHeaders) {
   return { userColIdx, commentColIdx, hasRecognizedHeader };
 }
 
+function extractParticipantsFromRows(rows) {
+  if (!rows || rows.length === 0) return [];
+
+  let { userColIdx, commentColIdx, hasRecognizedHeader } = detectCsvColumns(rows[0]);
+  const startIndex = hasRecognizedHeader ? 1 : 0;
+
+  if (!hasRecognizedHeader) {
+    userColIdx = 0;
+    commentColIdx = rows[0].length > 1 ? 1 : -1;
+  } else if (userColIdx === -1 && commentColIdx !== 0) {
+    userColIdx = 0;
+  }
+
+  const parsedComments = [];
+  for (let i = startIndex; i < rows.length; i++) {
+    const parts = rows[i];
+    const user = userColIdx !== -1 && userColIdx < parts.length ? parts[userColIdx] : '';
+    const comm = commentColIdx !== -1 && commentColIdx < parts.length && commentColIdx !== userColIdx
+      ? parts[commentColIdx]
+      : '';
+    const formatted = formatParticipantRecord(user, comm);
+    if (formatted) parsedComments.push(formatted);
+  }
+  return parsedComments;
+}
+
 function detectDelimiter(content, fileName) {
   const lowerName = fileName.toLowerCase();
   if (lowerName.endsWith('.tsv')) return '\t';
 
-  // Inspect first line outside quotes
   let inQuotes = false;
   const counts = { '\t': 0, ';': 0, ',': 0 };
   for (let i = 0; i < content.length; i++) {
@@ -527,7 +584,6 @@ function detectDelimiter(content, fileName) {
   return null;
 }
 
-// Full RFC-4180 CSV/TSV parser supporting commas & newlines inside quotes
 function parseDelimitedRows(text, delimiter) {
   const rows = [];
   let row = [];
@@ -617,7 +673,7 @@ function parseJsonComments(rawText) {
 function parseAndLoadFile(rawContent, fileName) {
   const content = String(rawContent || '').replace(/^\uFEFF/, '').trim();
   if (!content) {
-    showStatusMessage('O arquivo selecionado está vazio!', 'error');
+    showStatusMessage(sheetStatusMsg, 'O arquivo selecionado está vazio!', 'error');
     return;
   }
 
@@ -630,13 +686,13 @@ function parseAndLoadFile(rawContent, fileName) {
       parsedComments = parseJsonComments(content);
       if (parsedComments.length > 0) {
         namesInput.value = parsedComments.join('\n');
-        updateCount();
-        showStatusMessage(`📁 Arquivo JSON "${fileName}" importado com sucesso! ${parsedComments.length} comentário(s) carregado(s).`, 'success');
+        updateSheetCount();
+        showStatusMessage(sheetStatusMsg, `📊 Arquivo JSON "${fileName}" importado com sucesso! ${parsedComments.length} participante(s) carregado(s).`, 'success');
         return;
       }
     } catch (err) {
       if (lowerName.endsWith('.json')) {
-        showStatusMessage(`Erro ao interpretar o arquivo JSON "${fileName}". Verifique se o formato é válido.`, 'error');
+        showStatusMessage(sheetStatusMsg, `Erro ao interpretar o arquivo JSON "${fileName}". Verifique se o formato é válido.`, 'error');
         return;
       }
     }
@@ -648,30 +704,9 @@ function parseAndLoadFile(rawContent, fileName) {
 
   if (delimiter && (isTabularFile || content.split(/\r?\n/)[0].includes(delimiter))) {
     const rows = parseDelimitedRows(content, delimiter);
-    if (rows.length > 0) {
-      let { userColIdx, commentColIdx, hasRecognizedHeader } = detectCsvColumns(rows[0]);
-      const startIndex = hasRecognizedHeader ? 1 : 0;
-
-      // Fallback when CSV has no header row (e.g., "usuario","comentario")
-      if (!hasRecognizedHeader) {
-        userColIdx = 0;
-        commentColIdx = rows[0].length > 1 ? 1 : -1;
-      } else if (userColIdx === -1 && commentColIdx !== 0) {
-        userColIdx = 0;
-      }
-
-      for (let i = startIndex; i < rows.length; i++) {
-        const parts = rows[i];
-        const user = userColIdx !== -1 && userColIdx < parts.length ? parts[userColIdx] : '';
-        const comm = commentColIdx !== -1 && commentColIdx < parts.length && commentColIdx !== userColIdx
-          ? parts[commentColIdx]
-          : '';
-        const formatted = formatParticipantRecord(user, comm);
-        if (formatted) parsedComments.push(formatted);
-      }
-    }
+    parsedComments = extractParticipantsFromRows(rows);
   } else {
-    // 3. Plain Text (.txt): 1 participant / comment per line
+    // 3. Plain Text (.txt)
     parsedComments = content
       .split(/\r?\n/)
       .map(l => l.trim())
@@ -680,29 +715,19 @@ function parseAndLoadFile(rawContent, fileName) {
 
   if (parsedComments.length > 0) {
     namesInput.value = parsedComments.join('\n');
-    updateCount();
-    showStatusMessage(`📁 Arquivo "${fileName}" carregado com sucesso! ${parsedComments.length} linha(s) importada(s).`, 'success');
+    updateSheetCount();
+    showStatusMessage(sheetStatusMsg, `📊 Arquivo "${fileName}" carregado com sucesso! ${parsedComments.length} linha(s) importada(s).`, 'success');
   } else {
-    showStatusMessage(`Nenhum participante válido encontrado no arquivo "${fileName}".`, 'error');
+    showStatusMessage(sheetStatusMsg, `Nenhum participante válido encontrado no arquivo "${fileName}".`, 'error');
   }
 }
 
 // ==========================================
 // PARTICIPANT PARSING & FILTER ENGINE
 // ==========================================
-function getRawNamesList() {
-  const rawText = namesInput.value;
-  if (!rawText.trim()) return [];
-  return rawText
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(line => line.length > 0);
-}
-
 function parseParticipantLine(rawLine) {
   const line = rawLine.trim();
 
-  // Case 1: "@username - comment" or "Maria-Clara ✨ - comment" (explicit space + dash/pipe + space)
   const spacedSepMatch = line.match(/^(.{1,80}?)\s+[-–—|]\s+(.+)$/);
   if (spacedSepMatch) {
     return {
@@ -713,7 +738,6 @@ function parseParticipantLine(rawLine) {
     };
   }
 
-  // Case 2: "@username: comment" or "Nome: comment" (avoiding URLs like https://)
   const colonMatch = line.match(/^(@?[a-zA-Z0-9_.À-ÿ' -]{1,60}):\s+(.+)$/);
   if (colonMatch && !/^https?$/i.test(colonMatch[1].trim())) {
     return {
@@ -724,7 +748,6 @@ function parseParticipantLine(rawLine) {
     };
   }
 
-  // Case 3: "@username-comment" (tight dash right after @handle)
   const tightDashMatch = line.match(/^(@[a-zA-Z0-9_.]+)\s*[-–—|]\s*(.+)$/);
   if (tightDashMatch) {
     return {
@@ -735,7 +758,6 @@ function parseParticipantLine(rawLine) {
     };
   }
 
-  // Case 4: "@username comment text" (handle followed by space and comment)
   const handleSpaceMatch = line.match(/^(@[a-zA-Z0-9_.]+)\s+(.+)$/);
   if (handleSpaceMatch) {
     return {
@@ -746,7 +768,6 @@ function parseParticipantLine(rawLine) {
     };
   }
 
-  // Case 5: Standalone name or "@username" without comment text
   return {
     raw: line,
     author: line,
@@ -756,7 +777,6 @@ function parseParticipantLine(rawLine) {
 }
 
 function hasValidFriendMention(parsed) {
-  // Must mention at least one @friend inside the comment body (not the author's own handle or email)
   if (!parsed.hasCommentBody || !parsed.comment) return false;
 
   const cleanAuthor = parsed.author.replace(/^@/, '').toLowerCase();
@@ -772,17 +792,19 @@ function hasValidFriendMention(parsed) {
   return false;
 }
 
-function getFilteredParticipants() {
-  const rawLines = getRawNamesList();
+function getFilteredParticipantsFromText(rawText, removeDuplicates, requireMention) {
+  const rawLines = String(rawText || '')
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+
   let parsedList = rawLines.map(parseParticipantLine);
 
-  // Filter 1: Require friend @mention in comment body
-  if (optRequireMention.checked) {
+  if (requireMention) {
     parsedList = parsedList.filter(hasValidFriendMention);
   }
 
-  // Filter 2: Deduplicate by profile/author (1 chance per profile)
-  if (optRemoveDuplicates.checked) {
+  if (removeDuplicates) {
     const seenUsers = new Set();
     const deduped = [];
 
@@ -802,38 +824,49 @@ function getFilteredParticipants() {
   };
 }
 
-function updateCount() {
-  const { rawCount, validItems } = getFilteredParticipants();
+function getFilteredParticipants() {
+  return getFilteredParticipantsFromText(
+    namesInput.value,
+    optRemoveDuplicates.checked,
+    optRequireMention.checked
+  );
+}
+
+function updateBadgeElement(badgeEl, rawCount, validCount) {
   if (rawCount === 0) {
-    linesCountBadge.textContent = '0 participantes';
-  } else if (validItems.length === rawCount) {
-    linesCountBadge.textContent = `${validItems.length} participante(s)`;
+    badgeEl.textContent = '0 participantes';
+  } else if (validCount === rawCount) {
+    badgeEl.textContent = `${validCount} participante(s)`;
   } else {
-    linesCountBadge.textContent = `${validItems.length} válido(s) (de ${rawCount})`;
+    badgeEl.textContent = `${validCount} válido(s) (de ${rawCount})`;
   }
 }
 
-namesInput.addEventListener('input', updateCount);
-optRemoveDuplicates.addEventListener('change', updateCount);
-optRequireMention.addEventListener('change', updateCount);
+function updateSheetCount() {
+  const { rawCount, validItems } = getFilteredParticipants();
+  updateBadgeElement(linesCountBadge, rawCount, validItems.length);
+}
 
-// Botão Limpar
+namesInput.addEventListener('input', updateSheetCount);
+optRemoveDuplicates.addEventListener('change', updateSheetCount);
+optRequireMention.addEventListener('change', updateSheetCount);
+
 btnClearNames.addEventListener('click', () => {
   if (namesInput.value.trim() && confirm('Deseja limpar todos os participantes da lista?')) {
     namesInput.value = '';
-    updateCount();
-    fetchStatusMsg.classList.add('hidden');
+    updateSheetCount();
+    sheetStatusMsg.classList.add('hidden');
   }
 });
 
 // ==========================================
-// SORTEIO: NOMES / COMENTÁRIOS
+// EXECUÇÃO UNIFICADA DO SORTEIO DE PARTICIPANTES
 // ==========================================
-btnDrawNames.addEventListener('click', () => {
-  const { rawCount, validItems } = getFilteredParticipants();
+function executeParticipantsDraw({ rawText, removeDuplicates, requireMention, winnersCount, substitutesCount }) {
+  const { rawCount, validItems } = getFilteredParticipantsFromText(rawText, removeDuplicates, requireMention);
 
   if (rawCount === 0) {
-    alert('Por favor, carregue os comentários pelo link, importe um arquivo ou cole os participantes!');
+    alert('Por favor, importe uma planilha ou cole os participantes na lista!');
     return;
   }
 
@@ -841,9 +874,6 @@ btnDrawNames.addEventListener('click', () => {
     alert('Nenhum participante atendeu à regra "Exigir marcação de amigo com @"! Verifique se os comentários incluem o texto com @amigo.');
     return;
   }
-
-  const winnersCount = parseInt(document.getElementById('winners-count').value, 10);
-  const substitutesCount = parseInt(document.getElementById('substitutes-count').value, 10);
 
   if (isNaN(winnersCount) || winnersCount < 1) {
     alert('A quantidade de ganhadores principais deve ser de pelo menos 1!');
@@ -882,10 +912,20 @@ btnDrawNames.addEventListener('click', () => {
       showResults(winners, substitutes);
     }
   );
+}
+
+btnDrawSheet.addEventListener('click', () => {
+  executeParticipantsDraw({
+    rawText: namesInput.value,
+    removeDuplicates: optRemoveDuplicates.checked,
+    requireMention: optRequireMention.checked,
+    winnersCount: parseInt(sheetWinnersCountInput.value, 10),
+    substitutesCount: parseInt(sheetSubstitutesCountInput.value, 10)
+  });
 });
 
 // ==========================================
-// SORTEIO: NÚMEROS (O(qty) Memory-Safe)
+// ABA 3: SORTEIO DE NÚMEROS
 // ==========================================
 btnDrawNumbers.addEventListener('click', () => {
   const min = parseInt(document.getElementById('num-min').value, 10);
@@ -949,7 +989,6 @@ function runDrawAnimation(getSampleItem, onFinish) {
   resultBox.classList.add('hidden');
   animationBox.classList.remove('hidden');
 
-  // Force clean CSS transition reset from 0% to 100% on repeat draws
   loadingProgress.style.transition = 'none';
   loadingProgress.style.width = '0%';
   void loadingProgress.offsetWidth;

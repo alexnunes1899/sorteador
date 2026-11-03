@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sorteador Pro - Instagram, Facebook e Números</title>
+  <title>Sorteador Pro - Instagram, Planilha e Números</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <!-- SheetJS (Leitura nativa de Excel .xlsx / .xls) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <!-- Canvas Confetti CDN -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" defer></script>
 </head>
@@ -22,74 +24,125 @@
         <span class="logo-icon">🎲</span>
         <div class="logo-text">
           <h1>Sorteador<span>Pro</span></h1>
-          <p>Sorteios oficiais de Instagram, Facebook e Números</p>
+          <p>Sorteios oficiais por Link, Planilha e Números</p>
         </div>
       </div>
     </header>
 
-    <!-- Navigation Tabs -->
+    <!-- Navigation Tabs (3 Dedicated Tabs) -->
     <div class="tabs-container" role="tablist">
-      <button type="button" class="tab-btn active" data-tab="tab-social" role="tab" aria-selected="true">
-        <span class="tab-icon">📱</span>
-        Instagram &amp; Facebook
+      <button type="button" class="tab-btn active" data-tab="tab-link" role="tab" aria-selected="true">
+        <span class="tab-icon">🔗</span>
+        Por Link
+      </button>
+      <button type="button" class="tab-btn" data-tab="tab-sheet" role="tab" aria-selected="false">
+        <span class="tab-icon">📊</span>
+        Planilha / Lista
       </button>
       <button type="button" class="tab-btn" data-tab="tab-numbers" role="tab" aria-selected="false">
         <span class="tab-icon">🔢</span>
-        Sortear Números
+        Números
       </button>
     </div>
 
     <!-- Main Card -->
     <main class="main-card">
       
-      <!-- TAB 1: Sorteio Redes Sociais -->
-      <section id="tab-social" class="tab-content active" role="tabpanel">
-        
-        <!-- Método 1: Por Link -->
+      <!-- ========================================== -->
+      <!-- ABA 1: SORTEIO DIRETO POR LINK             -->
+      <!-- ========================================== -->
+      <section id="tab-link" class="tab-content active" role="tabpanel">
         <div class="link-fetch-card">
           <div class="link-header">
-            <label for="post-url">🔗 Método 1: Cole o link do Post</label>
-            <div class="header-actions">
-              <span class="network-badge" id="detected-network">Aguardando link...</span>
-              <button type="button" id="btn-open-api-modal" class="btn-api-settings" title="Configurar chave de API para busca direta">⚙️ API</button>
-            </div>
+            <label for="post-url">🔗 Cole o link da postagem do Instagram:</label>
+            <span class="network-badge" id="detected-network">Aguardando link...</span>
           </div>
           <div class="input-with-button">
             <input 
               type="url" 
               id="post-url" 
-              placeholder="Ex: https://www.instagram.com/p/C-xyz123... ou Facebook" 
+              placeholder="https://www.instagram.com/p/C-xyz123..." 
               autocomplete="off"
             >
             <button type="button" id="btn-fetch-comments" class="btn-fetch">
               <span class="btn-spinner hidden" id="fetch-spinner"></span>
-              <span id="btn-fetch-text">Carregar pelo Link</span>
+              <span id="btn-fetch-text">Carregar Comentários</span>
             </button>
           </div>
+          <small class="hint">Basta colar o link do post ou reel público e clicar em <strong>Realizar Sorteio</strong> (ou carregar antes para conferir a lista).</small>
           <div id="fetch-status-msg" class="fetch-status-msg hidden" role="status" aria-live="polite"></div>
         </div>
 
-        <!-- Divisor OU -->
-        <div class="or-divider">
-          <span>OU</span>
+        <!-- Preview de Comentários Carregados pelo Link -->
+        <div id="link-preview-box" class="form-group hidden" style="margin-top: 16px;">
+          <div class="label-row">
+            <label for="link-comments-input">Comentários encontrados na publicação:</label>
+            <span class="counter-badge" id="link-lines-count">0 participantes</span>
+          </div>
+          <textarea id="link-comments-input" readonly></textarea>
         </div>
 
-        <!-- Método 2: Importar Arquivo -->
-        <div class="file-import-card" id="drop-zone" role="button" tabindex="0" aria-label="Importar arquivo de comentários">
-          <input type="file" id="file-input" accept=".csv,.txt,.tsv,.json" class="hidden-file-input">
+        <!-- Opções e Regras (Aba Link) -->
+        <div class="options-grid" style="margin-top: 18px;">
+          <div class="option-card input-highlight">
+            <div class="option-info">
+              <label for="link-winners-count" class="opt-title">🏆 Ganhadores Principais</label>
+              <span class="opt-desc">Quantas pessoas serão sorteadas</span>
+            </div>
+            <input type="number" id="link-winners-count" min="1" max="100" value="1" class="styled-number-input">
+          </div>
+
+          <div class="option-card input-highlight">
+            <div class="option-info">
+              <label for="link-substitutes-count" class="opt-title">🛡️ Ganhadores Substitutos</label>
+              <span class="opt-desc">Suplentes em caso de desclassificação</span>
+            </div>
+            <input type="number" id="link-substitutes-count" min="0" max="50" value="1" class="styled-number-input">
+          </div>
+
+          <div class="option-card">
+            <label class="switch-container">
+              <input type="checkbox" id="link-remove-duplicates" checked>
+              <span class="checkmark"></span>
+              <span class="opt-label">Remover comentários repetidos (1 chance por perfil)</span>
+            </label>
+          </div>
+
+          <div class="option-card">
+            <label class="switch-container">
+              <input type="checkbox" id="link-require-mention">
+              <span class="checkmark"></span>
+              <span class="opt-label">Exigir marcação de amigo com @</span>
+            </label>
+          </div>
+        </div>
+
+        <button type="button" id="btn-draw-link" class="btn-primary">
+          <span class="btn-icon">⚡</span> REALIZAR SORTEIO
+        </button>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- ABA 2: SORTEIO POR PLANILHA / LISTA        -->
+      <!-- ========================================== -->
+      <section id="tab-sheet" class="tab-content" role="tabpanel">
+        <div class="file-import-card" id="drop-zone" role="button" tabindex="0" aria-label="Importar planilha ou arquivo de comentários">
+          <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.txt,.tsv,.json" class="hidden-file-input">
           <div class="import-content">
-            <span class="upload-icon">📁</span>
+            <span class="upload-icon">📊</span>
             <div class="upload-text">
-              <strong>Método 2: Importar arquivo de comentários</strong>
-              <p>Arraste seu arquivo <code>.csv</code>, <code>.txt</code>, <code>.tsv</code> ou <code>.json</code> aqui ou <span class="highlight-link" id="trigger-file-select">clique para selecionar</span></p>
+              <strong>Importar Planilha do Excel ou Arquivo de Comentários</strong>
+              <p>Arraste sua planilha <code>.xlsx</code>, <code>.xls</code>, <code>.csv</code>, <code>.txt</code> ou <code>.json</code> aqui ou <span class="highlight-link" id="trigger-file-select">clique para selecionar</span></p>
             </div>
           </div>
         </div>
 
-        <!-- Participants Area -->
+        <div id="sheet-status-msg" class="fetch-status-msg hidden" role="status" aria-live="polite"></div>
+
+        <!-- Lista de Participantes da Planilha -->
         <div class="form-group" style="margin-top: 20px;">
           <div class="label-row">
-            <label for="names-input">Lista de Comentários / Participantes:</label>
+            <label for="names-input">Participantes / Comentários da Planilha:</label>
             <div class="badge-actions">
               <button type="button" id="btn-clear-names" class="btn-clear" title="Limpar lista">🗑️ Limpar</button>
               <span class="counter-badge" id="lines-count">0 participantes</span>
@@ -97,41 +150,36 @@
           </div>
           <textarea 
             id="names-input" 
-            placeholder="Formato sugerido (1 por linha):&#10;@usuario - Comentário marcando @amigo1&#10;Ou apenas @usuario"
+            placeholder="Importe uma planilha acima ou cole os participantes aqui (1 por linha):&#10;@usuario - Comentário marcando @amigo1&#10;Ou apenas o nome / @usuario"
           ></textarea>
         </div>
 
-        <!-- Rules & Filters Grid -->
+        <!-- Opções e Regras (Aba Planilha) -->
         <div class="options-grid">
-          
-          <!-- Multiple Winners -->
           <div class="option-card input-highlight">
             <div class="option-info">
-              <label for="winners-count" class="opt-title">🏆 Ganhadores Principais</label>
+              <label for="sheet-winners-count" class="opt-title">🏆 Ganhadores Principais</label>
               <span class="opt-desc">Quantas pessoas serão sorteadas</span>
             </div>
-            <input type="number" id="winners-count" min="1" max="100" value="1" class="styled-number-input">
+            <input type="number" id="sheet-winners-count" min="1" max="100" value="1" class="styled-number-input">
           </div>
 
-          <!-- Substitutes / Reserves -->
           <div class="option-card input-highlight">
             <div class="option-info">
-              <label for="substitutes-count" class="opt-title">🛡️ Ganhadores Substitutos</label>
+              <label for="sheet-substitutes-count" class="opt-title">🛡️ Ganhadores Substitutos</label>
               <span class="opt-desc">Suplentes em caso de desclassificação</span>
             </div>
-            <input type="number" id="substitutes-count" min="0" max="50" value="1" class="styled-number-input">
+            <input type="number" id="sheet-substitutes-count" min="0" max="50" value="1" class="styled-number-input">
           </div>
 
-          <!-- Filter 1: Duplicates -->
           <div class="option-card">
             <label class="switch-container">
               <input type="checkbox" id="opt-remove-duplicates" checked>
               <span class="checkmark"></span>
-              <span class="opt-label">Remover comentários repetidos (1 chance por perfil)</span>
+              <span class="opt-label">Remover nomes/perfis repetidos (1 chance por pessoa)</span>
             </label>
           </div>
 
-          <!-- Filter 2: Mentions -->
           <div class="option-card">
             <label class="switch-container">
               <input type="checkbox" id="opt-require-mention">
@@ -141,12 +189,14 @@
           </div>
         </div>
 
-        <button type="button" id="btn-draw-names" class="btn-primary">
-          <span class="btn-icon">⚡</span> REALIZAR SORTEIO
+        <button type="button" id="btn-draw-sheet" class="btn-primary">
+          <span class="btn-icon">⚡</span> REALIZAR SORTEIO DA PLANILHA
         </button>
       </section>
 
-      <!-- TAB 2: Números -->
+      <!-- ========================================== -->
+      <!-- ABA 3: SORTEIO DE NÚMEROS                  -->
+      <!-- ========================================== -->
       <section id="tab-numbers" class="tab-content" role="tabpanel">
         <div class="numbers-grid">
           <div class="form-group">
@@ -216,27 +266,6 @@
       </div>
 
     </main>
-
-    <!-- Modal de Configuração de API (Opcional) -->
-    <div id="api-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="api-modal-title">
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3 id="api-modal-title">⚙️ Conectar API de Scraping</h3>
-          <button type="button" id="btn-close-modal" class="btn-close-modal" aria-label="Fechar janela">&times;</button>
-        </div>
-        <div class="modal-body">
-          <p>Para buscar comentários pelo link do Instagram automaticamente, conecte uma chave gratuita da <strong>RapidAPI</strong> (serviço <em>Instagram Scraper API2</em>).</p>
-          <div class="form-group" style="margin-top: 14px;">
-            <label for="rapidapi-key">Sua RapidAPI Key (opcional):</label>
-            <input type="password" id="rapidapi-key" placeholder="Ex: 8f92b7c4a1msh... (salva apenas no seu navegador)" autocomplete="off">
-          </div>
-          <small class="hint">Deixe em branco para usar gratuitamente o importador de arquivo (.csv, .txt, .tsv, .json) sem precisar de chave.</small>
-        </div>
-        <div class="modal-footer">
-          <button type="button" id="btn-save-api-key" class="btn-primary" style="padding: 10px 18px; font-size: 0.9rem;">Salvar Configuração</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Footer -->
     <footer class="footer">
