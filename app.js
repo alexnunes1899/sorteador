@@ -183,7 +183,8 @@ function stripInvisibleChars(str) {
 const tabBtns = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
-// Ações do Topo (Histórico & Modo Live Tela Cheia)
+// Ações do Topo (Demo, Histórico & Modo Live Tela Cheia)
+const btnLoadDemo = document.getElementById('btn-load-demo');
 const btnOpenHistory = document.getElementById('btn-open-history');
 const historyCountBadge = document.getElementById('history-count-badge');
 const btnFullscreen = document.getElementById('btn-fullscreen');
@@ -193,12 +194,31 @@ const btnCloseHistoryBottom = document.getElementById('btn-close-history-bottom'
 const historyList = document.getElementById('history-list');
 const btnClearHistory = document.getElementById('btn-clear-history');
 
+// Indicadores de Passo a Passo (Stepper 1-2-3) & Navegação Rápida
+const stepIndicators = [
+  document.getElementById('step-indicator-1'),
+  document.getElementById('step-indicator-2'),
+  document.getElementById('step-indicator-3')
+];
+const navPillBtns = document.querySelectorAll('.btn-nav-pill');
+
 // Identificação do Sorteio & Suspense da Roleta
 const giveawayMetaBox = document.getElementById('giveaway-meta-box');
 const giveawayTitleInput = document.getElementById('giveaway-title');
 const drawDurationSelect = document.getElementById('draw-duration-select');
 
-// Aba 1: Por Link
+// Aba 1: Conexão Oficial Instagram (Meta Graph API) & Link
+const DEFAULT_META_APP_ID = '1191736836515840';
+const btnInstaConnect = document.getElementById('btn-insta-connect');
+const instaConnectedBox = document.getElementById('insta-connected-box');
+const instaProfileAvatar = document.getElementById('insta-profile-avatar');
+const instaProfileHandle = document.getElementById('insta-profile-handle');
+const instaProfileSubtitle = document.getElementById('insta-profile-subtitle');
+const btnRefreshInstaPosts = document.getElementById('btn-refresh-insta-posts');
+const btnInstaLogout = document.getElementById('btn-insta-logout');
+const instaPostsStatus = document.getElementById('insta-posts-status');
+const instaPostsGrid = document.getElementById('insta-posts-grid');
+
 const postUrlInput = document.getElementById('post-url');
 const detectedNetworkBadge = document.getElementById('detected-network');
 const btnFetchComments = document.getElementById('btn-fetch-comments');
@@ -768,6 +788,447 @@ function showStatusMessage(targetEl, msg, type) {
 }
 
 // ==========================================
+// WORKFLOW STEPPER (Passo 1-2-3) & NAVEGAÇÃO
+// ==========================================
+function updateWorkflowStep(stepNum) {
+  stepIndicators.forEach((ind, idx) => {
+    if (!ind) return;
+    const s = idx + 1;
+    ind.classList.remove('active', 'completed');
+    if (s < stepNum) {
+      ind.classList.add('completed');
+    } else if (s === stepNum) {
+      ind.classList.add('active');
+    }
+  });
+}
+
+function loadDemoData() {
+  if (isGeneratingVideo) return;
+  // 1. Muda título
+  giveawayTitleInput.value = 'Sorteio Especial iPhone 16 #Demo';
+  if (resultTitleEditInput) resultTitleEditInput.value = 'Sorteio Especial iPhone 16 #Demo';
+
+  // 2. Ativa a aba Planilha / Lista
+  const sheetTabBtn = document.querySelector('.tab-btn[data-tab="tab-sheet"]');
+  if (sheetTabBtn) {
+    sheetTabBtn.click();
+  }
+
+  // 3. Define regras do sorteio
+  if (sheetWinnersCountInput) sheetWinnersCountInput.value = '1';
+  if (sheetSubstitutesCountInput) sheetSubstitutesCountInput.value = '2';
+
+  // 4. Cria avatares em canvas para os participantes da demo
+  const demoUsers = [
+    { u: 'mariasilva_oficial', name: 'Maria Silva', c: 'Quero muito ganhar esse iPhone! @amiga1 @amiga2', color: '#ec4899' },
+    { u: 'joaopaulo_tech', name: 'João Paulo', c: 'Participando com certeza! @tech_br @amigo_dev', color: '#3b82f6' },
+    { u: 'beatriz.lima', name: 'Beatriz Lima', c: 'Já é meu esse prêmio! @bia_sister @carol.m', color: '#8b5cf6' },
+    { u: 'lucas_mendes99', name: 'Lucas Mendes', c: 'Torcendo demais aqui @pedro_h @marcos.s', color: '#10b981' },
+    { u: 'camila_rocha', name: 'Camila Rocha', c: 'Top! Adorei as regras @julia_p @renata_c', color: '#f59e0b' },
+    { u: 'rafael_almeida', name: 'Rafael Almeida', c: 'Bora ganhar! @irmao_leo @gabriel.v', color: '#06b6d4' },
+    { u: 'fernanda.costa', name: 'Fernanda Costa', c: 'Seguindo todas as regras com carinho @mae_coruja', color: '#f43f5e' },
+    { u: 'thiago_santana', name: 'Thiago Santana', c: 'Sensacional esse sorteio! @amigo_luiz @ana.clara', color: '#14b8a6' },
+    { u: 'larissa_souza', name: 'Larissa Souza', c: 'Eu mereço esse prêmio maravilhoso @mariana_b', color: '#6366f1' },
+    { u: 'diego_oliveira', name: 'Diego Oliveira', c: 'Participei! Valeu pelo sorteio @paulinho_9', color: '#eab308' }
+  ];
+
+  const demoLines = demoUsers.map((u) => {
+    let avatarUri = '';
+    try {
+      const cvs = document.createElement('canvas');
+      cvs.width = 120;
+      cvs.height = 120;
+      const ctx = cvs.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = u.color;
+        ctx.beginPath();
+        ctx.arc(60, 60, 60, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 44px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const initials = u.name.split(' ').map(n => n[0]).join('').slice(0, 2);
+        ctx.fillText(initials, 60, 64);
+      }
+      avatarUri = cvs.toDataURL('image/png');
+    } catch (e) {
+      avatarUri = '';
+    }
+    return registerParticipantMeta(u.u, u.c, avatarUri, u.name);
+  });
+
+  namesInput.value = demoLines.join('\n');
+  updateSheetCount();
+  updateWorkflowStep(2);
+
+  if (sheetStatusMsg) {
+    showStatusMessage(sheetStatusMsg, '✨ 10 participantes de demonstração carregados com fotos e comentários! Clique em "Realizar Sorteio" abaixo para testar.', 'success');
+  }
+
+  if (btnDrawSheet) {
+    btnDrawSheet.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+if (btnLoadDemo) {
+  btnLoadDemo.addEventListener('click', loadDemoData);
+}
+
+navPillBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const targetId = btn.dataset.target;
+    if (!targetId) return;
+    const targetEl = document.getElementById(targetId);
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+});
+
+// ==========================================
+// INTEGRAÇÃO OFICIAL INSTAGRAM (META GRAPH API & OAUTH)
+// ==========================================
+let currentMetaAccessToken = safeStorageGet('sorteadorPro_metaToken') || '';
+let connectedIgAccount = null;
+let currentIgPosts = [];
+let selectedIgMediaId = null;
+
+function initFacebookSdk(appId = DEFAULT_META_APP_ID) {
+  return new Promise((resolve) => {
+    if (window.FB) {
+      resolve(window.FB);
+      return;
+    }
+    window.fbAsyncInit = function() {
+      if (window.FB && typeof window.FB.init === 'function') {
+        window.FB.init({
+          appId: appId,
+          cookie: true,
+          xfbml: false,
+          version: 'v20.0'
+        });
+        resolve(window.FB);
+      }
+    };
+
+    if (document.querySelector('script[data-meta-sdk="true"]')) {
+      return;
+    }
+    const js = document.createElement('script');
+    js.setAttribute('data-meta-sdk', 'true');
+    js.id = 'facebook-jssdk';
+    js.src = 'https://connect.facebook.net/pt_BR/sdk.js';
+    js.async = true;
+    js.defer = true;
+    js.crossOrigin = 'anonymous';
+    document.body.appendChild(js);
+  });
+}
+
+async function triggerInstagramLogin() {
+  try {
+    showStatusMessage(fetchStatusMsg, 'Iniciando autenticação oficial com a Meta...', 'info');
+    const FB = await initFacebookSdk();
+    if (!FB) {
+      throw new Error('Não foi possível carregar o SDK da Meta. Se o pop-up estiver bloqueado, cole o Token manualmente na opção abaixo!');
+    }
+
+    FB.login((response) => {
+      if (response.authResponse && response.authResponse.accessToken) {
+        handleMetaAccessToken(response.authResponse.accessToken);
+      } else {
+        showStatusMessage(fetchStatusMsg, 'Conexão cancelada ou não autorizada pela Meta.', 'info');
+      }
+    }, {
+      scope: 'instagram_basic,instagram_manage_comments,pages_show_list,pages_read_engagement',
+      return_scopes: true
+    });
+  } catch (err) {
+    showStatusMessage(fetchStatusMsg, `⚠️ ${err.message}`, 'error');
+  }
+}
+
+async function handleMetaAccessToken(token) {
+  if (!token) return;
+  safeStorageSet('sorteadorPro_metaToken', token.trim());
+  currentMetaAccessToken = token.trim();
+
+  showStatusMessage(fetchStatusMsg, 'Consultando sua conta e publicações na Meta Graph API...', 'info');
+  await loadConnectedInstagramProfile(currentMetaAccessToken);
+}
+
+async function loadConnectedInstagramProfile(token) {
+  if (!token) return;
+  try {
+    const accountsResp = await fetch(
+      `https://graph.facebook.com/v20.0/me/accounts?fields=name,access_token,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(token)}`
+    );
+    
+    if (!accountsResp.ok) {
+      const errData = await accountsResp.json().catch(() => ({}));
+      const errMsg = errData?.error?.message || `Erro HTTP ${accountsResp.status}`;
+      throw new Error(`Meta API: ${errMsg}`);
+    }
+
+    const accountsData = await accountsResp.json();
+    const pages = accountsData.data || [];
+    
+    let igAccount = null;
+    let pageToken = token;
+
+    for (const p of pages) {
+      if (p.instagram_business_account && p.instagram_business_account.id) {
+        igAccount = p.instagram_business_account;
+        pageToken = p.access_token || token;
+        break;
+      }
+    }
+
+    if (!igAccount) {
+      const directMe = await fetch(`https://graph.facebook.com/v20.0/me?fields=id,name&access_token=${encodeURIComponent(token)}`);
+      if (directMe.ok) {
+        const dData = await directMe.json();
+        showStatusMessage(
+          fetchStatusMsg,
+          `✅ Conectado como ${dData.name}! Para listar posts com fotos, certifique-se de que sua conta do Instagram é Profissional e vinculada a uma Página do Facebook. Você também pode colar o link do post direto no campo abaixo!`,
+          'success'
+        );
+      }
+      return;
+    }
+
+    connectedIgAccount = {
+      ...igAccount,
+      pageToken
+    };
+
+    if (instaProfileHandle) instaProfileHandle.textContent = `@${igAccount.username || igAccount.name}`;
+    if (instaProfileSubtitle) instaProfileSubtitle.textContent = `${igAccount.name || 'Conta Profissional'} • Instagram Oficial`;
+    if (instaProfileAvatar) {
+      instaProfileAvatar.src = igAccount.profile_picture_url || 'favicon.svg';
+    }
+    if (instaConnectedBox) instaConnectedBox.classList.remove('hidden');
+
+    await loadInstagramRecentPosts(igAccount.id, pageToken);
+  } catch (err) {
+    showStatusMessage(fetchStatusMsg, `⚠️ Não foi possível carregar dados da conta: ${err.message}`, 'error');
+  }
+}
+
+async function loadInstagramRecentPosts(igId, token) {
+  if (instaPostsStatus) instaPostsStatus.textContent = 'Carregando posts...';
+  if (instaPostsGrid) {
+    while (instaPostsGrid.firstChild) {
+      instaPostsGrid.removeChild(instaPostsGrid.firstChild);
+    }
+  }
+
+  try {
+    const mediaResp = await fetch(
+      `https://graph.facebook.com/v20.0/${igId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,comments_count,timestamp&limit=12&access_token=${encodeURIComponent(token)}`
+    );
+    if (!mediaResp.ok) throw new Error('Falha ao obter lista de posts do Instagram.');
+
+    const mediaData = await mediaResp.json();
+    currentIgPosts = mediaData.data || [];
+
+    if (instaPostsStatus) {
+      instaPostsStatus.textContent = `${currentIgPosts.length} post(s) encontrado(s)`;
+    }
+
+    renderInstagramPostsGrid(currentIgPosts);
+    showStatusMessage(fetchStatusMsg, `✅ ${currentIgPosts.length} publicação(ões) carregada(s)! Clique em um post para sortear.`, 'success');
+  } catch (err) {
+    if (instaPostsStatus) instaPostsStatus.textContent = 'Erro ao buscar posts';
+    showStatusMessage(fetchStatusMsg, `⚠️ ${err.message}`, 'error');
+  }
+}
+
+function renderInstagramPostsGrid(posts) {
+  if (!instaPostsGrid) return;
+  while (instaPostsGrid.firstChild) {
+    instaPostsGrid.removeChild(instaPostsGrid.firstChild);
+  }
+
+  if (posts.length === 0) {
+    const emptyMsg = document.createElement('p');
+    emptyMsg.className = 'text-muted';
+    emptyMsg.style.fontSize = '0.85rem';
+    emptyMsg.style.padding = '12px';
+    emptyMsg.textContent = 'Nenhuma publicação recente encontrada nesta conta.';
+    instaPostsGrid.appendChild(emptyMsg);
+    return;
+  }
+
+  posts.forEach((p) => {
+    const card = document.createElement('div');
+    card.className = 'insta-post-card';
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    card.dataset.id = p.id;
+
+    const img = document.createElement('img');
+    img.className = 'insta-post-thumb';
+    img.src = p.media_url || p.thumbnail_url || 'favicon.svg';
+    img.alt = p.caption ? p.caption.slice(0, 40) : 'Post Instagram';
+    img.loading = 'lazy';
+    card.appendChild(img);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'insta-post-info-overlay';
+    
+    const countSpan = document.createElement('span');
+    countSpan.textContent = `💬 ${p.comments_count || 0}`;
+    overlay.appendChild(countSpan);
+
+    const dateSpan = document.createElement('span');
+    if (p.timestamp) {
+      const d = new Date(p.timestamp);
+      dateSpan.textContent = `${d.getDate()}/${d.getMonth() + 1}`;
+    }
+    overlay.appendChild(dateSpan);
+    card.appendChild(overlay);
+
+    const indicator = document.createElement('div');
+    indicator.className = 'insta-post-select-indicator';
+    indicator.textContent = '✓';
+    card.appendChild(indicator);
+
+    card.addEventListener('click', () => {
+      selectInstagramPost(p);
+    });
+
+    instaPostsGrid.appendChild(card);
+  });
+}
+
+async function selectInstagramPost(post) {
+  selectedIgMediaId = post.id;
+
+  document.querySelectorAll('.insta-post-card').forEach((c) => {
+    c.classList.toggle('selected', c.dataset.id === post.id);
+  });
+
+  if (post.permalink && postUrlInput) {
+    postUrlInput.value = post.permalink;
+    detectedNetworkBadge.textContent = '📸 Instagram Detectado';
+    detectedNetworkBadge.className = 'network-badge instagram';
+  }
+
+  if (!giveawayTitleInput.value.trim() && post.caption) {
+    const cleanCap = post.caption.split('\n')[0].slice(0, 50).trim();
+    if (cleanCap) {
+      giveawayTitleInput.value = `Sorteio: ${cleanCap}`;
+    }
+  }
+
+  await fetchCommentsFromMetaPost(post.id);
+}
+
+async function fetchCommentsFromMetaPost(mediaId) {
+  const token = connectedIgAccount?.pageToken || currentMetaAccessToken;
+  if (!token) return false;
+
+  isFetchingLink = true;
+  btnFetchText.textContent = 'Buscando...';
+  fetchSpinner.classList.remove('hidden');
+  btnFetchComments.disabled = true;
+  btnDrawLink.disabled = true;
+  showStatusMessage(fetchStatusMsg, 'Baixando comentários oficiais direto da Meta Graph API...', 'info');
+
+  try {
+    const allComments = [];
+    let nextUrl = `https://graph.facebook.com/v20.0/${mediaId}/comments?fields=id,text,username,timestamp&limit=100&access_token=${encodeURIComponent(token)}`;
+    let pageCount = 0;
+    const maxPages = 40;
+
+    while (nextUrl && pageCount < maxPages) {
+      pageCount++;
+      const res = await fetch(nextUrl);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson?.error?.message || `Erro HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const items = data.data || [];
+      items.forEach((c) => {
+        if (c.username) {
+          allComments.push(c);
+        }
+      });
+
+      if (allComments.length > 0) {
+        showStatusMessage(fetchStatusMsg, `Carregando comentários oficiais... (${allComments.length} carregados)`, 'info');
+      }
+
+      nextUrl = data.paging?.next || null;
+      if (items.length === 0) break;
+    }
+
+    if (allComments.length === 0) {
+      throw new Error('Nenhum comentário encontrado nesta publicação.');
+    }
+
+    const parsed = allComments
+      .map(c => registerParticipantMeta(c.username, c.text, '', c.username))
+      .filter(Boolean);
+
+    linkCommentsInput.value = parsed.join('\n');
+    linkPreviewBox.classList.remove('hidden');
+    updateLinkCount();
+    updateWorkflowStep(2);
+
+    showStatusMessage(fetchStatusMsg, `✅ ${parsed.length} comentário(s) oficiais carregados da Meta com sucesso! Pronto para sortear.`, 'success');
+
+    if (btnDrawLink) {
+      btnDrawLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return true;
+  } catch (err) {
+    showStatusMessage(fetchStatusMsg, `⚠️ Erro ao buscar comentários da Meta: ${err.message}`, 'error');
+    return false;
+  } finally {
+    isFetchingLink = false;
+    btnFetchText.textContent = 'Carregar Comentários';
+    fetchSpinner.classList.add('hidden');
+    btnFetchComments.disabled = false;
+    btnDrawLink.disabled = false;
+  }
+}
+
+function disconnectInstagram() {
+  safeStorageRemove('sorteadorPro_metaToken');
+  currentMetaAccessToken = '';
+  connectedIgAccount = null;
+  currentIgPosts = [];
+  selectedIgMediaId = null;
+  if (instaConnectedBox) instaConnectedBox.classList.add('hidden');
+  showStatusMessage(fetchStatusMsg, 'Conta do Instagram desconectada.', 'info');
+}
+
+if (btnInstaConnect) {
+  btnInstaConnect.addEventListener('click', triggerInstagramLogin);
+}
+if (btnInstaLogout) {
+  btnInstaLogout.addEventListener('click', disconnectInstagram);
+}
+if (btnRefreshInstaPosts) {
+  btnRefreshInstaPosts.addEventListener('click', () => {
+    if (connectedIgAccount?.id) {
+      loadInstagramRecentPosts(connectedIgAccount.id, connectedIgAccount.pageToken);
+    }
+  });
+}
+
+// Restaura sessão se houver token salvo
+if (currentMetaAccessToken) {
+  loadConnectedInstagramProfile(currentMetaAccessToken);
+}
+
+
+// ==========================================
 // ABA 1: SORTEIO DIRETO PELO LINK
 // ==========================================
 postUrlInput.addEventListener('input', () => {
@@ -859,6 +1320,15 @@ async function fetchCommentsFromUrl(url) {
       return added;
     };
 
+    // 0. Se houver conexão com Meta Graph API e o post corresponder ou for selecionado:
+    const matchedMetaPost = currentIgPosts.find(p => p.permalink && p.permalink.includes(shortcode)) ||
+      (selectedIgMediaId ? currentIgPosts.find(p => p.id === selectedIgMediaId) : null);
+
+    if (matchedMetaPost && (connectedIgAccount?.pageToken || currentMetaAccessToken)) {
+      const ok = await fetchCommentsFromMetaPost(matchedMetaPost.id);
+      if (ok) return true;
+    }
+
     for (const provider of RAPIDAPI_PROVIDERS) {
       const firstResponse = await fetch(provider.buildUrl(shortcode, url, null), {
         method: 'GET',
@@ -868,14 +1338,8 @@ async function fetchCommentsFromUrl(url) {
         }
       });
 
-      if (firstResponse.status === 401 || firstResponse.status === 403) {
+      if (firstResponse.status === 401 || firstResponse.status === 403 || firstResponse.status === 429 || !firstResponse.ok) {
         continue;
-      }
-      if (firstResponse.status === 429) {
-        throw new Error('Limite gratuito de buscas da API atingido neste momento. Use a aba "📊 Planilha / Lista" sem limites!');
-      }
-      if (!firstResponse.ok) {
-        throw new Error(`Não foi possível consultar esta publicação (HTTP ${firstResponse.status}).`);
       }
 
       activeProvider = provider;
@@ -924,7 +1388,7 @@ async function fetchCommentsFromUrl(url) {
     }
 
     if (!activeProvider) {
-      throw new Error('Falta clicar em "Subscribe" no plano grátis ($0.00) da API "Instagram Scraper Stable API" na RapidAPI.');
+      throw new Error('A API externa atingiu o limite gratuito. Use o botão "Conectar com Instagram" acima para buscas 100% oficiais e gratuitas, ou use a aba "Planilha / Lista"!');
     }
 
     if (allComments.length > 0) {
@@ -969,6 +1433,54 @@ async function fetchCommentsFromUrl(url) {
     }
   } catch (err) {
     showStatusMessage(fetchStatusMsg, `⚠️ ${err.message}`, 'error');
+    if (fetchStatusMsg) {
+      const linkWrap = document.createElement('div');
+      linkWrap.style.marginTop = '10px';
+      linkWrap.style.display = 'flex';
+      linkWrap.style.flexWrap = 'wrap';
+      linkWrap.style.gap = '8px';
+
+      const instaLoginBtn = document.createElement('button');
+      instaLoginBtn.type = 'button';
+      instaLoginBtn.textContent = '📸 Conectar com Instagram (Oficial)';
+      instaLoginBtn.className = 'btn-secondary';
+      instaLoginBtn.style.fontSize = '0.78rem';
+      instaLoginBtn.style.padding = '6px 12px';
+      instaLoginBtn.style.cursor = 'pointer';
+      instaLoginBtn.addEventListener('click', () => {
+        triggerInstagramLogin();
+      });
+      linkWrap.appendChild(instaLoginBtn);
+
+      const sheetTabBtn = document.querySelector('.tab-btn[data-tab="tab-sheet"]');
+      if (sheetTabBtn) {
+        const goSheetBtn = document.createElement('button');
+        goSheetBtn.type = 'button';
+        goSheetBtn.textContent = '📊 Usar Aba Planilha / Lista (Sem Limites)';
+        goSheetBtn.className = 'btn-secondary';
+        goSheetBtn.style.fontSize = '0.78rem';
+        goSheetBtn.style.padding = '6px 12px';
+        goSheetBtn.style.cursor = 'pointer';
+        goSheetBtn.addEventListener('click', () => {
+          sheetTabBtn.click();
+        });
+        linkWrap.appendChild(goSheetBtn);
+      }
+
+      const rapidLink = document.createElement('a');
+      rapidLink.href = 'https://rapidapi.com/rockapis-rockapis-default/api/instagram-scraper-api2/pricing';
+      rapidLink.target = '_blank';
+      rapidLink.rel = 'noopener noreferrer';
+      rapidLink.textContent = '🔗 Ativar Plano Free na RapidAPI';
+      rapidLink.className = 'btn-secondary';
+      rapidLink.style.fontSize = '0.78rem';
+      rapidLink.style.padding = '6px 12px';
+      rapidLink.style.textDecoration = 'none';
+      rapidLink.style.display = 'inline-block';
+      linkWrap.appendChild(rapidLink);
+
+      fetchStatusMsg.appendChild(linkWrap);
+    }
     return false;
   } finally {
     isFetchingLink = false;
@@ -1017,6 +1529,14 @@ function updateLinkCount() {
     blacklist: linkBlacklist?.value || ''
   });
   updateBadgeElement(linkLinesCountBadge, rawCount, validItems.length);
+  if (btnDrawLink) {
+    if (validItems.length > 0) {
+      btnDrawLink.classList.add('btn-pulse');
+      updateWorkflowStep(2);
+    } else {
+      btnDrawLink.classList.remove('btn-pulse');
+    }
+  }
 }
 
 linkRemoveDuplicates.addEventListener('change', updateLinkCount);
@@ -1614,6 +2134,14 @@ function updateBadgeElement(badgeEl, rawCount, validCount) {
 function updateSheetCount() {
   const { rawCount, validItems } = getFilteredParticipants();
   updateBadgeElement(linesCountBadge, rawCount, validItems.length);
+  if (btnDrawSheet) {
+    if (validItems.length > 0) {
+      btnDrawSheet.classList.add('btn-pulse');
+      updateWorkflowStep(2);
+    } else {
+      btnDrawSheet.classList.remove('btn-pulse');
+    }
+  }
 }
 
 namesInput.addEventListener('input', updateSheetCount);
@@ -2209,6 +2737,7 @@ function showResults(winners, substitutes, metaContext = {}) {
   if (auditSha256HashEl) auditSha256HashEl.textContent = currentAuditInfo.sha256Hex;
 
   resultBox.classList.remove('hidden');
+  updateWorkflowStep(3);
   resultGiveawayBadge.textContent = getActiveGiveawayTitle();
   resultTitleEditInput.value = giveawayTitleInput.value.trim();
   resultTimestamp.textContent = `Realizado em: ${currentDrawDateStr}`;
@@ -4061,4 +4590,5 @@ function resetView() {
   if (activeTabBtn) {
     document.getElementById(activeTabBtn.dataset.tab).classList.add('active');
   }
+  updateWorkflowStep(1);
 }
