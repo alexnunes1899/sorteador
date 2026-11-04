@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Sorteador Pro - Servidor Local & Nuvem de Extração de Comentários do Instagram
-Executa na porta definida por PORT (8000 local / 10000 nuvem) e fornece:
-1. Servidor web para a aplicação estática
-2. API para extrair comentários de posts/reels do Instagram
-3. Suporte a sessão autenticada (IG_SESSIONID, ig_session.txt ou header X-IG-Session) para contornar bloqueios da Meta
+Fornece extração estável e confiável via API Apify (US$ 5/mês grátis) com fallbacks inteligentes.
 """
 
 import sys
@@ -25,37 +22,22 @@ if sys.platform.startswith('win'):
 
 PORT = int(os.environ.get('PORT', 8000))
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_APIFY_TOKEN = 'apify_api_KCMWUXKqdbYFwoyKg7fVKbZ5U21ogw1R8577'
 
-def get_ig_session_id():
-    """Recupera o cookie sessionid do Instagram da variável de ambiente ou de arquivo local."""
-    sid = os.environ.get('IG_SESSIONID', '').strip()
-    if sid:
-        return sid
-    local_file = os.path.join(WEB_DIR, 'ig_session.txt')
+def get_apify_token():
+    tok = os.environ.get('APIFY_TOKEN', '').strip()
+    if tok:
+        return tok
+    local_file = os.path.join(WEB_DIR, 'apify_token.txt')
     if os.path.exists(local_file):
         try:
             with open(local_file, 'r', encoding='utf-8') as f:
-                return f.read().strip()
+                content = f.read().strip()
+                if content:
+                    return content
         except Exception:
             pass
-    return ''
-
-def find_local_session_file():
-    """Procura automaticamente por arquivos de sessão salvos pelo Instaloader no computador."""
-    search_dirs = [
-        WEB_DIR,
-        os.path.expanduser('~/.config/instaloader'),
-        os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Instaloader')
-    ]
-    for d in search_dirs:
-        if d and os.path.exists(d):
-            try:
-                for fname in os.listdir(d):
-                    if fname.startswith('session-'):
-                        return os.path.join(d, fname)
-            except Exception:
-                pass
-    return None
+    return DEFAULT_APIFY_TOKEN
 
 def extract_shortcode(url_or_code):
     if not url_or_code:
@@ -68,105 +50,54 @@ def extract_shortcode(url_or_code):
         return clean
     return ''
 
-def fetch_comments_via_instaloader(shortcode, session_id=None, max_comments=300):
-    """Extrai comentários utilizando instaloader com suporte a cookies de sessão."""
+def fetch_comments_via_apify(url_or_shortcode, token=None, max_comments=300):
+    """Extrai comentários diretamente pela API profissional da Apify (US$ 5 grátis todo mês)."""
+    api_token = token or get_apify_token()
+    if not api_token:
+        return None, "Token Apify não configurado"
+
+    if url_or_shortcode.startswith('http'):
+        target_url = url_or_shortcode.split('?')[0]
+    else:
+        target_url = f"https://www.instagram.com/p/{url_or_shortcode}/"
+
+    endpoint = f"https://api.apify.com/v2/actors/apify~instagram-comment-scraper/run-sync-get-dataset-items?token={api_token}&format=json"
+    payload = {
+        'directUrls': [target_url],
+        'resultsLimit': max_comments,
+        'includeNestedComments': True
+    }
+
     try:
-        import instaloader
-        L = instaloader.Instaloader(
-            download_pictures=False,
-            download_videos=False,
-            download_video_thumbnails=False,
-            download_geotags=False,
-            download_comments=False,
-            save_metadata=False,
-            compress_json=False
+        req = urllib.request.Request(
+            endpoint,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
         )
-        
-        sid = session_id or get_ig_session_id()
-        if sid:
-            L.context._session.cookies['sessionid'] = sid
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            items = json.loads(resp.read().decode('utf-8'))
+            results = []
+            for it in items:
+                username = it.get('ownerUsername') or (it.get('owner', {}).get('username') if isinstance(it.get('owner'), dict) else '')
+                text = it.get('text') or ''
+                avatar = it.get('ownerProfilePicUrl') or (it.get('owner', {}).get('profile_pic_url') if isinstance(it.get('owner'), dict) else '')
+                full_name = it.get('owner', {}).get('full_name') if isinstance(it.get('owner'), dict) else username
 
-        sess_file = find_local_session_file()
-        if sess_file:
-            try:
-                base = os.path.basename(sess_file)
-                username = base.replace('session-', '')
-                L.load_session_from_file(username, sess_file)
-                print(f"[Instaloader] Sessao carregada de arquivo: {sess_file}")
-            except Exception as se:
-                print(f"[Instaloader] Falha ao carregar {sess_file}: {se}")
-
-        post = instaloader.Post.from_shortcode(L.context, shortcode)
-        results = []
-        count = 0
-        for comment in post.get_comments():
-            username = getattr(comment.owner, 'username', '') if comment.owner else ''
-            text = comment.text or ''
-            avatar_url = getattr(comment.owner, 'profile_pic_url', '') if comment.owner else ''
-            full_name = getattr(comment.owner, 'full_name', '') if comment.owner else ''
-
-            if username:
-                results.append({
-                    'username': username,
-                    'text': text,
-                    'avatar_url': avatar_url or '',
-                    'full_name': full_name or username
-                })
-                count += 1
-                if count >= max_comments:
-                    break
-        return results, None
-    except Exception as e:
-        err_msg = str(e)
-        print(f"[Instaloader Error] {type(e).__name__}: {err_msg}")
-        return None, err_msg
-
-def fetch_comments_via_graphql(shortcode, session_id=None, max_comments=150):
-    """Fallback via endpoint web do Instagram com suporte a cookie de sessão."""
-    sid = session_id or get_ig_session_id()
-    try:
-        alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
-        media_id = 0
-        for char in shortcode:
-            media_id = (media_id * 64) + alphabet.index(char)
-
-        url = f"https://www.instagram.com/api/v1/media/{media_id}/comments/?can_support_threading=true&permalink_enabled=false"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-            'X-IG-App-ID': '936619743392459',
-            'X-ASBD-ID': '129477',
-            'Accept': '*/*',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8',
-            'Referer': f'https://www.instagram.com/p/{shortcode}/'
-        }
-        if sid:
-            headers['Cookie'] = f'sessionid={sid};'
-
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=12) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            raw_comments = data.get('comments', [])
-            comments = []
-            for c in raw_comments:
-                u = c.get('user', {})
-                username = u.get('username', '')
-                text = c.get('text', '')
-                avatar = u.get('profile_pic_url', '')
-                full_name = u.get('full_name', username)
                 if username:
-                    comments.append({
+                    results.append({
                         'username': username,
                         'text': text,
-                        'avatar_url': avatar,
-                        'full_name': full_name
+                        'avatar_url': avatar or '',
+                        'full_name': full_name or username
                     })
-                    if len(comments) >= max_comments:
-                        break
-            if comments:
-                return comments
+            if results:
+                return results, None
+            return None, "Nenhum comentário retornado nesta publicação"
     except Exception as e:
-        print(f"[Web API Error] {e}")
-    return None
+        err_msg = str(e)
+        print(f"[Apify API Error] {err_msg}")
+        return None, err_msg
 
 class SorteadorHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -175,7 +106,7 @@ class SorteadorHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-IG-Session')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Apify-Token')
         self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
         super().end_headers()
 
@@ -190,12 +121,11 @@ class SorteadorHandler(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
-            sid = get_ig_session_id()
-            has_session = bool(sid) or bool(find_local_session_file())
+            tok = get_apify_token()
             resp = json.dumps({
                 'status': 'online',
-                'authenticated': has_session,
-                'message': 'Servidor ativo e pronto'
+                'apify_configured': bool(tok),
+                'message': 'Servidor com API Apify ativa e pronto'
             }).encode('utf-8')
             self.wfile.write(resp)
             return
@@ -203,8 +133,8 @@ class SorteadorHandler(SimpleHTTPRequestHandler):
         if parsed.path == '/api/comments':
             params = urllib.parse.parse_qs(parsed.query)
             target_url = params.get('url', [''])[0]
-            session_id = params.get('sessionid', [''])[0]
-            self.process_comments_request(target_url, session_id=session_id)
+            token = params.get('token', [''])[0]
+            self.process_comments_request(target_url, token=token)
             return
 
         super().do_GET()
@@ -219,15 +149,15 @@ class SorteadorHandler(SimpleHTTPRequestHandler):
                 data = json.loads(body)
             except Exception:
                 data = {}
-            sid = data.get('sessionid', '').strip()
-            if sid:
+            tok = data.get('apify_token', '').strip()
+            if tok:
                 try:
-                    with open(os.path.join(WEB_DIR, 'ig_session.txt'), 'w', encoding='utf-8') as f:
-                        f.write(sid)
+                    with open(os.path.join(WEB_DIR, 'apify_token.txt'), 'w', encoding='utf-8') as f:
+                        f.write(tok)
                     self.send_response(200)
                     self.send_header('Content-Type', 'application/json; charset=utf-8')
                     self.end_headers()
-                    self.wfile.write(json.dumps({'success': True, 'message': 'Cookie sessionid salvo com sucesso!'}).encode('utf-8'))
+                    self.wfile.write(json.dumps({'success': True, 'message': 'Token salvo com sucesso!'}).encode('utf-8'))
                     return
                 except Exception as e:
                     self.send_response(500)
@@ -238,7 +168,7 @@ class SorteadorHandler(SimpleHTTPRequestHandler):
             self.send_response(400)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
-            self.wfile.write(json.dumps({'success': False, 'error': 'Cookie sessionid inválido'}).encode('utf-8'))
+            self.wfile.write(json.dumps({'success': False, 'error': 'Token inválido'}).encode('utf-8'))
             return
 
         if parsed.path == '/api/comments':
@@ -249,17 +179,18 @@ class SorteadorHandler(SimpleHTTPRequestHandler):
             except Exception:
                 data = {}
             target_url = data.get('url', '')
-            session_id = data.get('sessionid', '')
-            self.process_comments_request(target_url, session_id=session_id)
+            token = data.get('token', '')
+            self.process_comments_request(target_url, token=token)
             return
 
         self.send_response(404)
         self.end_headers()
 
-    def process_comments_request(self, target_url, session_id=None):
+    def process_comments_request(self, target_url, token=None):
         shortcode = extract_shortcode(target_url)
-        sid = session_id or self.headers.get('X-IG-Session', '').strip() or get_ig_session_id()
-        if not shortcode:
+        apify_tok = token or self.headers.get('X-Apify-Token', '').strip() or get_apify_token()
+
+        if not shortcode and not target_url:
             self.send_response(400)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
@@ -269,17 +200,13 @@ class SorteadorHandler(SimpleHTTPRequestHandler):
             }).encode('utf-8'))
             return
 
-        print(f"[Extraindo Comentários] Post/Reel: {shortcode} (Sessão: {'Sim' if sid else 'Não'})...")
+        clean_url = target_url or f"https://www.instagram.com/p/{shortcode}/"
+        print(f"[Extraindo Comentários via Apify] URL: {clean_url}...")
 
-        # 1. Tenta Instaloader
-        comments, last_err = fetch_comments_via_instaloader(shortcode, session_id=sid)
-
-        # 2. Se falhar, tenta Web API / GraphQL
-        if not comments:
-            comments = fetch_comments_via_graphql(shortcode, session_id=sid)
+        comments, last_err = fetch_comments_via_apify(clean_url, token=apify_tok)
 
         if comments is not None and len(comments) > 0:
-            print(f"[Sucesso] {len(comments)} comentários extraídos com sucesso!")
+            print(f"[Sucesso Apify] {len(comments)} comentários extraídos com sucesso!")
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
@@ -290,29 +217,23 @@ class SorteadorHandler(SimpleHTTPRequestHandler):
                 'comments': comments
             }).encode('utf-8'))
         else:
-            print(f"[Aviso] Não foi possível extrair comentários do post {shortcode}")
+            print(f"[Aviso] Falha ao extrair comentários via Apify: {last_err}")
             self.send_response(502)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.end_headers()
-            
-            hint = "O Instagram bloqueou o acesso anônimo aos comentários deste post."
-            if last_err and "Login required" in str(last_err):
-                hint = "O Instagram exige sessão/login para liberar os comentários desta publicação (política anti-scraping da Meta)."
-
             self.wfile.write(json.dumps({
                 'success': False,
-                'error': f'{hint} Salve seu cookie sessionid (ou execute conectar-sessao.bat) ou use a aba Planilha / Lista para importar os participantes!'
+                'error': f'Não foi possível extrair comentários automaticamente ({last_err}). Use a aba Planilha / Lista para importar os participantes!'
             }).encode('utf-8'))
 
 def run_server():
     server_address = ('0.0.0.0', PORT)
     httpd = HTTPServer(server_address, SorteadorHandler)
-    sid = get_ig_session_id()
-    sess_file = find_local_session_file()
+    tok = get_apify_token()
     print("=" * 60)
     print("  SORTEADOR WEB - SERVIDOR INICIADO")
     print(f"  Porta: {PORT}")
-    print(f"  Sessão Instagram: {'Ativa (Autenticado)' if (sid or sess_file) else 'Não configurada (Modo Anônimo)'}")
+    print(f"  API Apify: {'Ativa (Token configurado)' if tok else 'Token pendente'}")
     print("  Endpoint API: /api/comments")
     print("=" * 60)
     try:

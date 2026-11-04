@@ -3,6 +3,8 @@
 // ==========================================
 const LOCAL_SERVER_URL = 'http://127.0.0.1:8000';
 const CLOUD_SERVER_URL = 'https://sorteador-lx.onrender.com';
+const DEFAULT_APIFY_TOKEN = 'apify_api_KCMWUXKqdbYFwoyKg7fVKbZ5U21ogw1R8577';
+let currentApifyToken = safeStorageGet('sorteador_apify_token') || DEFAULT_APIFY_TOKEN;
 
 // ==========================================
 // AUDIO SYNTHESIZER (Lazy Web Audio API)
@@ -861,46 +863,78 @@ async function fetchCommentsFromUrl(url) {
     let comments = null;
     let sourceLabel = '';
 
-    const igSessionVal = safeStorageGet('sorteador_ig_session') || '';
+    // 1. MÉTODO PRINCIPAL: APIFY (Nuvem 24h, sem bloqueios da Meta, US$ 5 Grátis Todo Mês)
+    const token = currentApifyToken || DEFAULT_APIFY_TOKEN;
+    if (token) {
+      try {
+        showStatusMessage(fetchStatusMsg, '⚡ Extraindo comentários via API Apify (US$ 5 Grátis Todo Mês)...', 'info');
+        const cleanUrl = url.split('?')[0];
+        const apifyEndpoint = `https://api.apify.com/v2/actors/apify~instagram-comment-scraper/run-sync-get-dataset-items?token=${encodeURIComponent(token)}&format=json`;
 
-    // 1. Tenta primeiro o Servidor Local (porta 8000)
-    try {
-      showStatusMessage(fetchStatusMsg, 'Verificando Servidor Local (porta 8000)...', 'info');
-      const localController = new AbortController();
-      const localTimeout = setTimeout(() => localController.abort(), 6000);
-      const localHeaders = { 'Accept': 'application/json' };
-      if (igSessionVal) localHeaders['X-IG-Session'] = igSessionVal;
+        const apifyController = new AbortController();
+        const apifyTimeout = setTimeout(() => apifyController.abort(), 60000);
 
-      const localResp = await fetch(`${LOCAL_SERVER_URL}/api/comments?url=${encodeURIComponent(url)}`, {
-        method: 'GET',
-        headers: localHeaders,
-        signal: localController.signal
-      }).catch(() => null);
-      clearTimeout(localTimeout);
+        const apifyResp = await fetch(apifyEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            directUrls: [cleanUrl],
+            resultsLimit: 300,
+            includeNestedComments: true
+          }),
+          signal: apifyController.signal
+        }).catch(() => null);
+        clearTimeout(apifyTimeout);
 
-      if (localResp && localResp.ok) {
-        const localData = await localResp.json();
-        if (localData && localData.success && Array.isArray(localData.comments) && localData.comments.length > 0) {
-          comments = localData.comments;
-          sourceLabel = 'Servidor Local Próprio';
+        if (apifyResp && apifyResp.ok) {
+          const items = await apifyResp.json();
+          if (Array.isArray(items) && items.length > 0) {
+            comments = items.map(it => ({
+              username: it.ownerUsername || it.owner?.username || '',
+              text: it.text || '',
+              avatar_url: it.ownerProfilePicUrl || it.owner?.profile_pic_url || '',
+              full_name: it.owner?.full_name || it.ownerUsername || ''
+            })).filter(c => c.username);
+            sourceLabel = 'Apify Cloud API (Oficial)';
+          }
         }
+      } catch (apifyErr) {
+        console.warn('Apify fetch warning:', apifyErr);
       }
-    } catch (localErr) {
-      // Local indisponível, segue para nuvem
     }
 
-    // 2. Se o local não respondeu, tenta o Servidor na Nuvem (Render 24h)
+    // 2. Fallback: Servidor Local (porta 8000)
+    if (!comments) {
+      try {
+        showStatusMessage(fetchStatusMsg, 'Verificando Servidor Local (porta 8000)...', 'info');
+        const localController = new AbortController();
+        const localTimeout = setTimeout(() => localController.abort(), 6000);
+        const localResp = await fetch(`${LOCAL_SERVER_URL}/api/comments?url=${encodeURIComponent(url)}`, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          signal: localController.signal
+        }).catch(() => null);
+        clearTimeout(localTimeout);
+
+        if (localResp && localResp.ok) {
+          const localData = await localResp.json();
+          if (localData && localData.success && Array.isArray(localData.comments) && localData.comments.length > 0) {
+            comments = localData.comments;
+            sourceLabel = 'Servidor Local Próprio';
+          }
+        }
+      } catch (localErr) {}
+    }
+
+    // 3. Fallback: Servidor na Nuvem (Render 24h)
     if (!comments) {
       try {
         showStatusMessage(fetchStatusMsg, 'Buscando comentários via Servidor na Nuvem (Render 24h)...', 'info');
         const cloudController = new AbortController();
-        const cloudTimeout = setTimeout(() => cloudController.abort(), 45000); // 45s para acomodar cold start do Render
-        const cloudHeaders = { 'Accept': 'application/json' };
-        if (igSessionVal) cloudHeaders['X-IG-Session'] = igSessionVal;
-
+        const cloudTimeout = setTimeout(() => cloudController.abort(), 45000);
         const cloudResp = await fetch(`${CLOUD_SERVER_URL}/api/comments?url=${encodeURIComponent(url)}`, {
           method: 'GET',
-          headers: cloudHeaders,
+          headers: { 'Accept': 'application/json' },
           signal: cloudController.signal
         }).catch(() => null);
         clearTimeout(cloudTimeout);
@@ -912,9 +946,7 @@ async function fetchCommentsFromUrl(url) {
             sourceLabel = 'Servidor Nuvem (Render 24h)';
           }
         }
-      } catch (cloudErr) {
-        // Nuvem falhou ou offline
-      }
+      } catch (cloudErr) {}
     }
 
     if (comments && comments.length > 0) {
@@ -972,67 +1004,38 @@ async function fetchCommentsFromUrl(url) {
 }
 
 if (inputIgSession) {
-  const savedSid = safeStorageGet('sorteador_ig_session') || '';
-  if (savedSid) inputIgSession.value = savedSid;
+  inputIgSession.value = currentApifyToken;
 }
 
 if (btnSaveIgSession) {
   btnSaveIgSession.addEventListener('click', async () => {
-    const sid = inputIgSession ? inputIgSession.value.trim() : '';
-    if (sid) {
-      safeStorageSet('sorteador_ig_session', sid);
+    const val = inputIgSession ? inputIgSession.value.trim() : '';
+    if (val) {
+      safeStorageSet('sorteador_apify_token', val);
+      currentApifyToken = val;
       try {
         await fetch(`${LOCAL_SERVER_URL}/api/session`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionid: sid })
+          body: JSON.stringify({ apify_token: val })
         }).catch(() => {});
       } catch (e) {}
-      showStatusMessage(fetchStatusMsg, '✅ Sessão do Instagram salva com sucesso! Agora você pode buscar qualquer post.', 'success');
+      showStatusMessage(fetchStatusMsg, '✅ Token da Apify salvo com sucesso! Cota ativa.', 'success');
       checkLocalServerStatus();
     } else {
-      safeStorageRemove('sorteador_ig_session');
-      showStatusMessage(fetchStatusMsg, 'Sessão do Instagram removida.', 'info');
+      safeStorageRemove('sorteador_apify_token');
+      currentApifyToken = DEFAULT_APIFY_TOKEN;
+      if (inputIgSession) inputIgSession.value = DEFAULT_APIFY_TOKEN;
+      showStatusMessage(fetchStatusMsg, 'Token redefinido para o padrão integrado.', 'info');
       checkLocalServerStatus();
     }
   });
 }
 
 async function checkLocalServerStatus() {
-  const hasClientSession = Boolean(safeStorageGet('sorteador_ig_session'));
-
-  try {
-    const r = await fetch(`${LOCAL_SERVER_URL}/api/status`, { method: 'GET' }).catch(() => null);
-    if (r && r.ok) {
-      const d = await r.json();
-      if (d && d.status === 'online') {
-        if (localServerBadge) {
-          const isAuth = d.authenticated || hasClientSession;
-          localServerBadge.textContent = isAuth ? '🟢 Servidor Local (Instagram Conectado)' : '🟢 Servidor Local Ativo';
-          localServerBadge.classList.remove('hidden');
-        }
-        return;
-      }
-    }
-  } catch (e) {}
-
-  try {
-    const rCloud = await fetch(`${CLOUD_SERVER_URL}/api/status`, { method: 'GET' }).catch(() => null);
-    if (rCloud && rCloud.ok) {
-      const dCloud = await rCloud.json();
-      if (dCloud && dCloud.status === 'online') {
-        if (localServerBadge) {
-          const isAuth = dCloud.authenticated || hasClientSession;
-          localServerBadge.textContent = isAuth ? '☁️ Servidor Nuvem (Instagram Conectado)' : '☁️ Servidor Nuvem Ativo (24h)';
-          localServerBadge.classList.remove('hidden');
-        }
-        return;
-      }
-    }
-  } catch (e) {}
-
   if (localServerBadge) {
-    localServerBadge.classList.add('hidden');
+    localServerBadge.textContent = '⚡ API Apify Integrada (US$ 5 Grátis)';
+    localServerBadge.classList.remove('hidden');
   }
 }
 checkLocalServerStatus();
