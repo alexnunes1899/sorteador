@@ -195,6 +195,8 @@ const btnFetchText = document.getElementById('btn-fetch-text');
 const fetchSpinner = document.getElementById('fetch-spinner');
 const fetchStatusMsg = document.getElementById('fetch-status-msg');
 const localServerBadge = document.getElementById('local-server-badge');
+const inputIgSession = document.getElementById('input-ig-session');
+const btnSaveIgSession = document.getElementById('btn-save-ig-session');
 const linkPreviewBox = document.getElementById('link-preview-box');
 const linkCommentsInput = document.getElementById('link-comments-input');
 const linkLinesCountBadge = document.getElementById('link-lines-count');
@@ -859,14 +861,19 @@ async function fetchCommentsFromUrl(url) {
     let comments = null;
     let sourceLabel = '';
 
+    const igSessionVal = safeStorageGet('sorteador_ig_session') || '';
+
     // 1. Tenta primeiro o Servidor Local (porta 8000)
     try {
       showStatusMessage(fetchStatusMsg, 'Verificando Servidor Local (porta 8000)...', 'info');
       const localController = new AbortController();
-      const localTimeout = setTimeout(() => localController.abort(), 5000);
+      const localTimeout = setTimeout(() => localController.abort(), 6000);
+      const localHeaders = { 'Accept': 'application/json' };
+      if (igSessionVal) localHeaders['X-IG-Session'] = igSessionVal;
+
       const localResp = await fetch(`${LOCAL_SERVER_URL}/api/comments?url=${encodeURIComponent(url)}`, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' },
+        headers: localHeaders,
         signal: localController.signal
       }).catch(() => null);
       clearTimeout(localTimeout);
@@ -888,9 +895,12 @@ async function fetchCommentsFromUrl(url) {
         showStatusMessage(fetchStatusMsg, 'Buscando comentários via Servidor na Nuvem (Render 24h)...', 'info');
         const cloudController = new AbortController();
         const cloudTimeout = setTimeout(() => cloudController.abort(), 45000); // 45s para acomodar cold start do Render
+        const cloudHeaders = { 'Accept': 'application/json' };
+        if (igSessionVal) cloudHeaders['X-IG-Session'] = igSessionVal;
+
         const cloudResp = await fetch(`${CLOUD_SERVER_URL}/api/comments?url=${encodeURIComponent(url)}`, {
           method: 'GET',
-          headers: { 'Accept': 'application/json' },
+          headers: cloudHeaders,
           signal: cloudController.signal
         }).catch(() => null);
         clearTimeout(cloudTimeout);
@@ -961,14 +971,44 @@ async function fetchCommentsFromUrl(url) {
   }
 }
 
+if (inputIgSession) {
+  const savedSid = safeStorageGet('sorteador_ig_session') || '';
+  if (savedSid) inputIgSession.value = savedSid;
+}
+
+if (btnSaveIgSession) {
+  btnSaveIgSession.addEventListener('click', async () => {
+    const sid = inputIgSession ? inputIgSession.value.trim() : '';
+    if (sid) {
+      safeStorageSet('sorteador_ig_session', sid);
+      try {
+        await fetch(`${LOCAL_SERVER_URL}/api/session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionid: sid })
+        }).catch(() => {});
+      } catch (e) {}
+      showStatusMessage(fetchStatusMsg, '✅ Sessão do Instagram salva com sucesso! Agora você pode buscar qualquer post.', 'success');
+      checkLocalServerStatus();
+    } else {
+      safeStorageRemove('sorteador_ig_session');
+      showStatusMessage(fetchStatusMsg, 'Sessão do Instagram removida.', 'info');
+      checkLocalServerStatus();
+    }
+  });
+}
+
 async function checkLocalServerStatus() {
+  const hasClientSession = Boolean(safeStorageGet('sorteador_ig_session'));
+
   try {
     const r = await fetch(`${LOCAL_SERVER_URL}/api/status`, { method: 'GET' }).catch(() => null);
     if (r && r.ok) {
       const d = await r.json();
       if (d && d.status === 'online') {
         if (localServerBadge) {
-          localServerBadge.textContent = '🟢 Servidor Local Ativo';
+          const isAuth = d.authenticated || hasClientSession;
+          localServerBadge.textContent = isAuth ? '🟢 Servidor Local (Instagram Conectado)' : '🟢 Servidor Local Ativo';
           localServerBadge.classList.remove('hidden');
         }
         return;
@@ -982,7 +1022,8 @@ async function checkLocalServerStatus() {
       const dCloud = await rCloud.json();
       if (dCloud && dCloud.status === 'online') {
         if (localServerBadge) {
-          localServerBadge.textContent = '☁️ Servidor Nuvem Ativo (24h)';
+          const isAuth = dCloud.authenticated || hasClientSession;
+          localServerBadge.textContent = isAuth ? '☁️ Servidor Nuvem (Instagram Conectado)' : '☁️ Servidor Nuvem Ativo (24h)';
           localServerBadge.classList.remove('hidden');
         }
         return;
