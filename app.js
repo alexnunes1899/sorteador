@@ -1,28 +1,8 @@
 // ==========================================
-// CONFIGURAÇÃO INTEGRADA DA API (Multi-Provedor RapidAPI)
+// CONFIGURAÇÃO DOS SERVIDORES (Local & Nuvem Render)
 // ==========================================
-const DEFAULT_RAPIDAPI_KEY = '33f3227ee8msh6818ae7d446c656p1a527ejsn067883af0870';
-let currentRapidApiKey = safeStorageGet('sorteadorPro_customRapidApiKey') || DEFAULT_RAPIDAPI_KEY;
-const RAPIDAPI_PROVIDERS = [
-  {
-    name: 'Instagram Scraper Stable API',
-    host: 'instagram-scraper-stable-api.p.rapidapi.com',
-    buildUrl: (shortcode, url, cursor) => {
-      let ep = `https://instagram-scraper-stable-api.p.rapidapi.com/get_post_comments.php?media_code=${encodeURIComponent(shortcode || url)}`;
-      if (cursor) ep += `&pagination_token=${encodeURIComponent(cursor)}`;
-      return ep;
-    }
-  },
-  {
-    name: 'Instagram Scraper API2',
-    host: 'instagram-scraper-api2.p.rapidapi.com',
-    buildUrl: (shortcode, url, cursor) => {
-      let ep = `https://instagram-scraper-api2.p.rapidapi.com/v1/comments?code_or_id_or_url=${encodeURIComponent(shortcode || url)}`;
-      if (cursor) ep += `&pagination_token=${encodeURIComponent(cursor)}`;
-      return ep;
-    }
-  }
-];
+const LOCAL_SERVER_URL = 'http://127.0.0.1:8000';
+const CLOUD_SERVER_URL = 'https://sorteador-lx.onrender.com';
 
 // ==========================================
 // AUDIO SYNTHESIZER (Lazy Web Audio API)
@@ -207,27 +187,13 @@ const giveawayMetaBox = document.getElementById('giveaway-meta-box');
 const giveawayTitleInput = document.getElementById('giveaway-title');
 const drawDurationSelect = document.getElementById('draw-duration-select');
 
-// Aba 1: Conexão Oficial Instagram (Meta Graph API) & Link
-const DEFAULT_META_APP_ID = '1191736836515840';
-const btnInstaConnect = document.getElementById('btn-insta-connect');
-const btnFbConnectAlt = document.getElementById('btn-fb-connect-alt');
-const instaConnectedBox = document.getElementById('insta-connected-box');
-const instaProfileAvatar = document.getElementById('insta-profile-avatar');
-const instaProfileHandle = document.getElementById('insta-profile-handle');
-const instaProfileSubtitle = document.getElementById('insta-profile-subtitle');
-const btnRefreshInstaPosts = document.getElementById('btn-refresh-insta-posts');
-const btnInstaLogout = document.getElementById('btn-insta-logout');
-const instaPostsStatus = document.getElementById('insta-posts-status');
-const instaPostsGrid = document.getElementById('insta-posts-grid');
-
+// Aba 1: Sorteio Direto por Link (Servidor Nuvem ou Local)
 const postUrlInput = document.getElementById('post-url');
 const detectedNetworkBadge = document.getElementById('detected-network');
 const btnFetchComments = document.getElementById('btn-fetch-comments');
 const btnFetchText = document.getElementById('btn-fetch-text');
 const fetchSpinner = document.getElementById('fetch-spinner');
 const fetchStatusMsg = document.getElementById('fetch-status-msg');
-const customRapidApiKeyInput = document.getElementById('custom-rapidapi-key');
-const btnSaveRapidApiKey = document.getElementById('btn-save-rapidapi-key');
 const localServerBadge = document.getElementById('local-server-badge');
 const linkPreviewBox = document.getElementById('link-preview-box');
 const linkCommentsInput = document.getElementById('link-comments-input');
@@ -820,455 +786,6 @@ navPillBtns.forEach(btn => {
 });
 
 // ==========================================
-// INTEGRAÇÃO OFICIAL INSTAGRAM (META GRAPH API & OAUTH)
-// ==========================================
-let currentMetaAccessToken = safeStorageGet('sorteadorPro_metaToken') || '';
-let connectedIgAccount = null;
-let currentIgPosts = [];
-let selectedIgMediaId = null;
-
-// Abre login direto no INSTAGRAM (www.instagram.com)
-function triggerInstagramLogin() {
-  const appId = DEFAULT_META_APP_ID;
-  let redirectUri = 'https://alexnunes1899.github.io/sorteador/';
-  if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
-    redirectUri = window.location.href.split('#')[0].split('?')[0];
-  }
-
-  // Escopos oficiais do Instagram para Criadores e Profissionais
-  const scopes = 'instagram_business_basic,instagram_business_manage_comments';
-  const oauthUrl = `https://www.instagram.com/oauth/authorize?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code`;
-
-  showStatusMessage(fetchStatusMsg, 'Abrindo janela oficial do Instagram (instagram.com)...', 'info');
-  openAuthPopup(oauthUrl, 'InstagramLogin');
-}
-
-// Abre login alternativo via Facebook (para Páginas com Instagram vinculado)
-function triggerFacebookLogin() {
-  const appId = DEFAULT_META_APP_ID;
-  let redirectUri = 'https://alexnunes1899.github.io/sorteador/';
-  if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
-    redirectUri = window.location.href.split('#')[0].split('?')[0];
-  }
-
-  const scopes = 'instagram_basic,instagram_manage_comments,pages_show_list,pages_read_engagement';
-  const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=token&display=popup`;
-
-  showStatusMessage(fetchStatusMsg, 'Abrindo login via Facebook (Meta Graph API)...', 'info');
-  openAuthPopup(oauthUrl, 'MetaFacebookLogin');
-}
-
-function openAuthPopup(oauthUrl, windowName) {
-  const width = 640;
-  const height = 720;
-  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
-  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
-
-  let popup = null;
-  try {
-    popup = window.open(
-      oauthUrl,
-      windowName,
-      `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,status=yes,resizable=yes`
-    );
-  } catch (e) {
-    popup = null;
-  }
-
-  if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-    showStatusMessage(fetchStatusMsg, '⚠️ O navegador bloqueou a janela pop-up. Redirecionando na mesma aba...', 'info');
-    window.location.href = oauthUrl;
-    return;
-  }
-
-  let pollTimer = setInterval(() => {
-    try {
-      if (!popup || popup.closed) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-        return;
-      }
-
-      let currentHref = '';
-      try {
-        currentHref = popup.location.href;
-      } catch (crossErr) {
-        // Cross-origin normal enquanto o usuário navega em instagram.com ou facebook.com
-        return;
-      }
-
-      if (currentHref && (currentHref.includes('code=') || currentHref.includes('access_token=') || currentHref.includes('error='))) {
-        const hash = popup.location.hash || '';
-        const search = popup.location.search || '';
-        const params = new URLSearchParams(
-          (search.startsWith('?') ? search.substring(1) : search) ||
-          (hash.startsWith('#') ? hash.substring(1) : hash)
-        );
-
-        const code = params.get('code');
-        const token = params.get('access_token');
-        const errorDesc = params.get('error_description') || params.get('error');
-
-        clearInterval(pollTimer);
-        pollTimer = null;
-        try { popup.close(); } catch (e) {}
-
-        if (code) {
-          handleInstagramAuthCode(code.replace(/#_$/, ''));
-        } else if (token) {
-          handleMetaAccessToken(token);
-        } else if (errorDesc) {
-          showStatusMessage(fetchStatusMsg, `⚠️ Autorização cancelada ou recusada: ${decodeURIComponent(errorDesc)}`, 'error');
-        }
-      }
-    } catch (e) {
-      // Ignora erro cross-origin
-    }
-  }, 500);
-}
-
-// Escuta mensagens postMessage caso a página abra e redirecione dentro da janela
-window.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'INSTA_AUTH_CODE' && event.data.code) {
-    handleInstagramAuthCode(event.data.code);
-  }
-  if (event.data && event.data.type === 'META_AUTH_TOKEN' && event.data.token) {
-    handleMetaAccessToken(event.data.token);
-  }
-});
-
-function checkUrlForMetaToken() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const code = urlParams.get('code');
-  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-  const token = hashParams.get('access_token');
-
-  if (window.opener) {
-    if (code) {
-      try {
-        window.opener.postMessage({ type: 'INSTA_AUTH_CODE', code: code.replace(/#_$/, '') }, '*');
-        window.close();
-        return;
-      } catch (e) {}
-    }
-    if (token) {
-      try {
-        window.opener.postMessage({ type: 'META_AUTH_TOKEN', token }, '*');
-        window.close();
-        return;
-      } catch (e) {}
-    }
-  }
-
-  if (code) {
-    if (window.history && window.history.replaceState) {
-      window.history.replaceState(null, '', window.location.pathname + window.location.hash);
-    }
-    handleInstagramAuthCode(code.replace(/#_$/, ''));
-  } else if (token) {
-    if (window.history && window.history.replaceState) {
-      window.history.replaceState(null, '', window.location.pathname + window.location.hash);
-    }
-    handleMetaAccessToken(token);
-  }
-}
-
-async function handleInstagramAuthCode(code) {
-  if (!code) return;
-  const cleanCode = code.replace(/#_$/, '');
-  safeStorageSet('sorteadorPro_instaAuthCode', cleanCode);
-  showStatusMessage(fetchStatusMsg, '✅ Conta do Instagram autorizada com sucesso! Conectada!', 'success');
-
-  if (instaConnectedBox) instaConnectedBox.classList.remove('hidden');
-  if (instaProfileHandle) instaProfileHandle.textContent = 'Conta Instagram Conectada';
-  if (instaProfileSubtitle) instaProfileSubtitle.textContent = 'Login Oficial Concluído • Selecione um post ou cole o link abaixo';
-}
-
-async function handleMetaAccessToken(token) {
-  if (!token) return;
-  safeStorageSet('sorteadorPro_metaToken', token.trim());
-  currentMetaAccessToken = token.trim();
-
-  showStatusMessage(fetchStatusMsg, 'Consultando sua conta e publicações na Meta Graph API...', 'info');
-  await loadConnectedInstagramProfile(currentMetaAccessToken);
-}
-
-async function loadConnectedInstagramProfile(token) {
-  if (!token) return;
-  try {
-    const accountsResp = await fetch(
-      `https://graph.facebook.com/v20.0/me/accounts?fields=name,access_token,instagram_business_account{id,username,name,profile_picture_url}&access_token=${encodeURIComponent(token)}`
-    );
-    
-    if (!accountsResp.ok) {
-      const errData = await accountsResp.json().catch(() => ({}));
-      const errMsg = errData?.error?.message || `Erro HTTP ${accountsResp.status}`;
-      throw new Error(`Meta API: ${errMsg}`);
-    }
-
-    const accountsData = await accountsResp.json();
-    const pages = accountsData.data || [];
-    
-    let igAccount = null;
-    let pageToken = token;
-
-    for (const p of pages) {
-      if (p.instagram_business_account && p.instagram_business_account.id) {
-        igAccount = p.instagram_business_account;
-        pageToken = p.access_token || token;
-        break;
-      }
-    }
-
-    if (!igAccount) {
-      const directMe = await fetch(`https://graph.facebook.com/v20.0/me?fields=id,name&access_token=${encodeURIComponent(token)}`);
-      if (directMe.ok) {
-        const dData = await directMe.json();
-        showStatusMessage(
-          fetchStatusMsg,
-          `✅ Conectado como ${dData.name}! Para listar posts com fotos, certifique-se de que sua conta do Instagram é Profissional e vinculada a uma Página do Facebook. Você também pode colar o link do post direto no campo abaixo!`,
-          'success'
-        );
-      }
-      return;
-    }
-
-    connectedIgAccount = {
-      ...igAccount,
-      pageToken
-    };
-
-    if (instaProfileHandle) instaProfileHandle.textContent = `@${igAccount.username || igAccount.name}`;
-    if (instaProfileSubtitle) instaProfileSubtitle.textContent = `${igAccount.name || 'Conta Profissional'} • Instagram Oficial`;
-    if (instaProfileAvatar) {
-      instaProfileAvatar.src = igAccount.profile_picture_url || 'favicon.svg';
-    }
-    if (instaConnectedBox) instaConnectedBox.classList.remove('hidden');
-
-    await loadInstagramRecentPosts(igAccount.id, pageToken);
-  } catch (err) {
-    showStatusMessage(fetchStatusMsg, `⚠️ Não foi possível carregar dados da conta: ${err.message}`, 'error');
-  }
-}
-
-async function loadInstagramRecentPosts(igId, token) {
-  if (instaPostsStatus) instaPostsStatus.textContent = 'Carregando posts...';
-  if (instaPostsGrid) {
-    while (instaPostsGrid.firstChild) {
-      instaPostsGrid.removeChild(instaPostsGrid.firstChild);
-    }
-  }
-
-  try {
-    const mediaResp = await fetch(
-      `https://graph.facebook.com/v20.0/${igId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,comments_count,timestamp&limit=12&access_token=${encodeURIComponent(token)}`
-    );
-    if (!mediaResp.ok) throw new Error('Falha ao obter lista de posts do Instagram.');
-
-    const mediaData = await mediaResp.json();
-    currentIgPosts = mediaData.data || [];
-
-    if (instaPostsStatus) {
-      instaPostsStatus.textContent = `${currentIgPosts.length} post(s) encontrado(s)`;
-    }
-
-    renderInstagramPostsGrid(currentIgPosts);
-    showStatusMessage(fetchStatusMsg, `✅ ${currentIgPosts.length} publicação(ões) carregada(s)! Clique em um post para sortear.`, 'success');
-  } catch (err) {
-    if (instaPostsStatus) instaPostsStatus.textContent = 'Erro ao buscar posts';
-    showStatusMessage(fetchStatusMsg, `⚠️ ${err.message}`, 'error');
-  }
-}
-
-function renderInstagramPostsGrid(posts) {
-  if (!instaPostsGrid) return;
-  while (instaPostsGrid.firstChild) {
-    instaPostsGrid.removeChild(instaPostsGrid.firstChild);
-  }
-
-  if (posts.length === 0) {
-    const emptyMsg = document.createElement('p');
-    emptyMsg.className = 'text-muted';
-    emptyMsg.style.fontSize = '0.85rem';
-    emptyMsg.style.padding = '12px';
-    emptyMsg.textContent = 'Nenhuma publicação recente encontrada nesta conta.';
-    instaPostsGrid.appendChild(emptyMsg);
-    return;
-  }
-
-  posts.forEach((p) => {
-    const card = document.createElement('div');
-    card.className = 'insta-post-card';
-    card.setAttribute('role', 'button');
-    card.setAttribute('tabindex', '0');
-    card.dataset.id = p.id;
-
-    const img = document.createElement('img');
-    img.className = 'insta-post-thumb';
-    img.src = p.media_url || p.thumbnail_url || 'favicon.svg';
-    img.alt = p.caption ? p.caption.slice(0, 40) : 'Post Instagram';
-    img.loading = 'lazy';
-    card.appendChild(img);
-
-    const overlay = document.createElement('div');
-    overlay.className = 'insta-post-info-overlay';
-    
-    const countSpan = document.createElement('span');
-    countSpan.textContent = `💬 ${p.comments_count || 0}`;
-    overlay.appendChild(countSpan);
-
-    const dateSpan = document.createElement('span');
-    if (p.timestamp) {
-      const d = new Date(p.timestamp);
-      dateSpan.textContent = `${d.getDate()}/${d.getMonth() + 1}`;
-    }
-    overlay.appendChild(dateSpan);
-    card.appendChild(overlay);
-
-    const indicator = document.createElement('div');
-    indicator.className = 'insta-post-select-indicator';
-    indicator.textContent = '✓';
-    card.appendChild(indicator);
-
-    card.addEventListener('click', () => {
-      selectInstagramPost(p);
-    });
-
-    instaPostsGrid.appendChild(card);
-  });
-}
-
-async function selectInstagramPost(post) {
-  selectedIgMediaId = post.id;
-
-  document.querySelectorAll('.insta-post-card').forEach((c) => {
-    c.classList.toggle('selected', c.dataset.id === post.id);
-  });
-
-  if (post.permalink && postUrlInput) {
-    postUrlInput.value = post.permalink;
-    detectedNetworkBadge.textContent = '📸 Instagram Detectado';
-    detectedNetworkBadge.className = 'network-badge instagram';
-  }
-
-  if (!giveawayTitleInput.value.trim() && post.caption) {
-    const cleanCap = post.caption.split('\n')[0].slice(0, 50).trim();
-    if (cleanCap) {
-      giveawayTitleInput.value = `Sorteio: ${cleanCap}`;
-    }
-  }
-
-  await fetchCommentsFromMetaPost(post.id);
-}
-
-async function fetchCommentsFromMetaPost(mediaId) {
-  const token = connectedIgAccount?.pageToken || currentMetaAccessToken;
-  if (!token) return false;
-
-  isFetchingLink = true;
-  btnFetchText.textContent = 'Buscando...';
-  fetchSpinner.classList.remove('hidden');
-  btnFetchComments.disabled = true;
-  btnDrawLink.disabled = true;
-  showStatusMessage(fetchStatusMsg, 'Baixando comentários oficiais direto da Meta Graph API...', 'info');
-
-  try {
-    const allComments = [];
-    let nextUrl = `https://graph.facebook.com/v20.0/${mediaId}/comments?fields=id,text,username,timestamp&limit=100&access_token=${encodeURIComponent(token)}`;
-    let pageCount = 0;
-    const maxPages = 40;
-
-    while (nextUrl && pageCount < maxPages) {
-      pageCount++;
-      const res = await fetch(nextUrl);
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson?.error?.message || `Erro HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      const items = data.data || [];
-      items.forEach((c) => {
-        if (c.username) {
-          allComments.push(c);
-        }
-      });
-
-      if (allComments.length > 0) {
-        showStatusMessage(fetchStatusMsg, `Carregando comentários oficiais... (${allComments.length} carregados)`, 'info');
-      }
-
-      nextUrl = data.paging?.next || null;
-      if (items.length === 0) break;
-    }
-
-    if (allComments.length === 0) {
-      throw new Error('Nenhum comentário encontrado nesta publicação.');
-    }
-
-    const parsed = allComments
-      .map(c => registerParticipantMeta(c.username, c.text, '', c.username))
-      .filter(Boolean);
-
-    linkCommentsInput.value = parsed.join('\n');
-    linkPreviewBox.classList.remove('hidden');
-    updateLinkCount();
-    updateWorkflowStep(2);
-
-    showStatusMessage(fetchStatusMsg, `✅ ${parsed.length} comentário(s) oficiais carregados da Meta com sucesso! Pronto para sortear.`, 'success');
-
-    if (btnDrawLink) {
-      btnDrawLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-    return true;
-  } catch (err) {
-    showStatusMessage(fetchStatusMsg, `⚠️ Erro ao buscar comentários da Meta: ${err.message}`, 'error');
-    return false;
-  } finally {
-    isFetchingLink = false;
-    btnFetchText.textContent = 'Carregar Comentários';
-    fetchSpinner.classList.add('hidden');
-    btnFetchComments.disabled = false;
-    btnDrawLink.disabled = false;
-  }
-}
-
-function disconnectInstagram() {
-  safeStorageRemove('sorteadorPro_metaToken');
-  currentMetaAccessToken = '';
-  connectedIgAccount = null;
-  currentIgPosts = [];
-  selectedIgMediaId = null;
-  if (instaConnectedBox) instaConnectedBox.classList.add('hidden');
-  showStatusMessage(fetchStatusMsg, 'Conta do Instagram desconectada.', 'info');
-}
-
-if (btnInstaConnect) {
-  btnInstaConnect.addEventListener('click', triggerInstagramLogin);
-}
-if (btnFbConnectAlt) {
-  btnFbConnectAlt.addEventListener('click', triggerFacebookLogin);
-}
-if (btnInstaLogout) {
-  btnInstaLogout.addEventListener('click', disconnectInstagram);
-}
-if (btnRefreshInstaPosts) {
-  btnRefreshInstaPosts.addEventListener('click', () => {
-    if (connectedIgAccount?.id) {
-      loadInstagramRecentPosts(connectedIgAccount.id, connectedIgAccount.pageToken);
-    }
-  });
-}
-
-// Verifica se a página recebeu access_token no redirecionamento OAuth
-checkUrlForMetaToken();
-
-// Restaura sessão se houver token salvo
-if (currentMetaAccessToken) {
-  loadConnectedInstagramProfile(currentMetaAccessToken);
-}
-
-
-// ==========================================
 // ABA 1: SORTEIO DIRETO PELO LINK
 // ==========================================
 postUrlInput.addEventListener('input', () => {
@@ -1318,7 +835,7 @@ async function fetchCommentsFromUrl(url) {
   if (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.watch') || lowerUrl.includes('fb.com')) {
     showStatusMessage(
       fetchStatusMsg,
-      '📘 Para posts do Facebook, a Meta restringe acesso externo por link. Use a aba "📊 Planilha / Lista" ao lado para importar os comentários!',
+      '📘 Para posts do Facebook, utilize a aba "📊 Planilha / Lista" ao lado para importar os comentários!',
       'info'
     );
     return false;
@@ -1332,7 +849,6 @@ async function fetchCommentsFromUrl(url) {
   fetchSpinner.classList.remove('hidden');
   btnFetchComments.disabled = true;
   btnDrawLink.disabled = true;
-  showStatusMessage(fetchStatusMsg, 'Carregando comentários da publicação no Instagram...', 'info');
 
   try {
     const shortcode = extractInstagramShortcode(url);
@@ -1340,200 +856,75 @@ async function fetchCommentsFromUrl(url) {
       throw new Error('Cole o link direto de um Post ou Reel do Instagram (ex: https://www.instagram.com/p/CODIGO/).');
     }
 
-    const allComments = [];
-    const seenCommentIds = new Set();
-    const maxPages = 40;
-    let activeProvider = null;
+    let comments = null;
+    let sourceLabel = '';
 
-    const pushUniqueComments = (items) => {
-      if (!Array.isArray(items)) return 0;
-      let added = 0;
-      for (const c of items) {
-        const cid = String(c?.pk || c?.id || c?.comment_id || '').trim();
-        if (cid) {
-          if (seenCommentIds.has(cid)) continue;
-          seenCommentIds.add(cid);
-        }
-        allComments.push(c);
-        added++;
-      }
-      return added;
-    };
-
-    // 0. Se houver conexão com Meta Graph API e o post corresponder ou for selecionado:
-    const matchedMetaPost = currentIgPosts.find(p => p.permalink && p.permalink.includes(shortcode)) ||
-      (selectedIgMediaId ? currentIgPosts.find(p => p.id === selectedIgMediaId) : null);
-
-    if (matchedMetaPost && (connectedIgAccount?.pageToken || currentMetaAccessToken)) {
-      const ok = await fetchCommentsFromMetaPost(matchedMetaPost.id);
-      if (ok) return true;
-    }
-
-    // 0. Se o Servidor Próprio Local estiver ativo, tenta extrair diretamente por ele
+    // 1. Tenta primeiro o Servidor Local (porta 8000)
     try {
-      showStatusMessage(fetchStatusMsg, 'Tentando extrair comentários via Servidor Local Próprio...', 'info');
-      const localResp = await fetch(`http://127.0.0.1:8000/api/comments?url=${encodeURIComponent(url)}`, {
+      showStatusMessage(fetchStatusMsg, 'Verificando Servidor Local (porta 8000)...', 'info');
+      const localController = new AbortController();
+      const localTimeout = setTimeout(() => localController.abort(), 5000);
+      const localResp = await fetch(`${LOCAL_SERVER_URL}/api/comments?url=${encodeURIComponent(url)}`, {
         method: 'GET',
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        signal: localController.signal
       }).catch(() => null);
+      clearTimeout(localTimeout);
 
       if (localResp && localResp.ok) {
         const localData = await localResp.json();
         if (localData && localData.success && Array.isArray(localData.comments) && localData.comments.length > 0) {
-          const parsed = localData.comments
-            .map(c => registerParticipantMeta(c.username, c.text, c.avatar_url, c.full_name || c.username))
-            .filter(Boolean);
-
-          linkCommentsInput.value = parsed.join('\n');
-          lastFetchedUrl = url;
-          linkPreviewBox.classList.remove('hidden');
-          updateLinkCount();
-          updateWorkflowStep(2);
-
-          showStatusMessage(fetchStatusMsg, `✅ ${parsed.length} comentário(s) extraídos com sucesso pelo seu Servidor Local Próprio! Pronto para sortear.`, 'success');
-          if (btnDrawLink) {
-            btnDrawLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-          return true;
+          comments = localData.comments;
+          sourceLabel = 'Servidor Local Próprio';
         }
       }
     } catch (localErr) {
-      // Servidor local offline, tenta nuvem Render
+      // Local indisponível, segue para nuvem
     }
 
-    // 0.2 Se o Servidor na Nuvem (Render) estiver ativo, tenta extrair por ele
-    try {
-      showStatusMessage(fetchStatusMsg, 'Tentando extrair comentários via Servidor Nuvem (Render 24h)...', 'info');
-      const cloudResp = await fetch(`https://sorteador-lx.onrender.com/api/comments?url=${encodeURIComponent(url)}`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' }
-      }).catch(() => null);
-
-      if (cloudResp && cloudResp.ok) {
-        const cloudData = await cloudResp.json();
-        if (cloudData && cloudData.success && Array.isArray(cloudData.comments) && cloudData.comments.length > 0) {
-          const parsed = cloudData.comments
-            .map(c => registerParticipantMeta(c.username, c.text, c.avatar_url, c.full_name || c.username))
-            .filter(Boolean);
-
-          linkCommentsInput.value = parsed.join('\n');
-          lastFetchedUrl = url;
-          linkPreviewBox.classList.remove('hidden');
-          updateLinkCount();
-          updateWorkflowStep(2);
-
-          showStatusMessage(fetchStatusMsg, `✅ ${parsed.length} comentário(s) extraídos com sucesso pelo Servidor na Nuvem (24h)! Pronto para sortear.`, 'success');
-          if (btnDrawLink) {
-            btnDrawLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-          return true;
-        }
-      }
-    } catch (cloudErr) {
-      // Servidor nuvem offline, segue para os provedores alternativos
-    }
-
-    for (const provider of RAPIDAPI_PROVIDERS) {
-      const firstResponse = await fetch(provider.buildUrl(shortcode, url, null), {
-        method: 'GET',
-        headers: {
-          'x-rapidapi-key': currentRapidApiKey,
-          'x-rapidapi-host': provider.host
-        }
-      });
-
-      if (firstResponse.status === 401 || firstResponse.status === 403 || firstResponse.status === 429 || !firstResponse.ok) {
-        continue;
-      }
-
-      activeProvider = provider;
-      const firstData = await firstResponse.json();
-      const firstItems = firstData?.comments || firstData?.data?.comments || firstData?.data?.items || firstData?.items || [];
-      pushUniqueComments(firstItems);
-      if (allComments.length > 0) {
-        showStatusMessage(fetchStatusMsg, `Buscando comentários... Página 1 (${allComments.length} carregados)`, 'info');
-      }
-
-      let paginationToken = firstData?.pagination_token || firstData?.next_max_id || firstData?.data?.pagination_token || null;
-      const seenTokens = new Set();
-
-      for (let page = 1; page < maxPages && paginationToken && firstItems.length > 0; page++) {
-        if (seenTokens.has(paginationToken)) {
-          paginationToken = null;
-          break;
-        }
-        seenTokens.add(paginationToken);
-
-        const nextResp = await fetch(activeProvider.buildUrl(shortcode, url, paginationToken), {
+    // 2. Se o local não respondeu, tenta o Servidor na Nuvem (Render 24h)
+    if (!comments) {
+      try {
+        showStatusMessage(fetchStatusMsg, 'Buscando comentários via Servidor na Nuvem (Render 24h)...', 'info');
+        const cloudController = new AbortController();
+        const cloudTimeout = setTimeout(() => cloudController.abort(), 45000); // 45s para acomodar cold start do Render
+        const cloudResp = await fetch(`${CLOUD_SERVER_URL}/api/comments?url=${encodeURIComponent(url)}`, {
           method: 'GET',
-          headers: {
-            'x-rapidapi-key': currentRapidApiKey,
-            'x-rapidapi-host': activeProvider.host
+          headers: { 'Accept': 'application/json' },
+          signal: cloudController.signal
+        }).catch(() => null);
+        clearTimeout(cloudTimeout);
+
+        if (cloudResp && cloudResp.ok) {
+          const cloudData = await cloudResp.json();
+          if (cloudData && cloudData.success && Array.isArray(cloudData.comments) && cloudData.comments.length > 0) {
+            comments = cloudData.comments;
+            sourceLabel = 'Servidor Nuvem (Render 24h)';
           }
-        });
-        if (!nextResp.ok) break;
-        const nextData = await nextResp.json();
-        const nextItems = nextData?.comments || nextData?.data?.comments || nextData?.data?.items || nextData?.items || [];
-        const newlyAdded = pushUniqueComments(nextItems);
-        if (newlyAdded > 0) {
-          showStatusMessage(fetchStatusMsg, `Buscando comentários... Página ${page + 1} (${allComments.length} carregados)`, 'info');
         }
-        paginationToken = nextData?.pagination_token || nextData?.next_max_id || nextData?.data?.pagination_token || null;
-        if (!Array.isArray(nextItems) || nextItems.length === 0 || newlyAdded === 0) {
-          paginationToken = null;
-          break;
-        }
+      } catch (cloudErr) {
+        // Nuvem falhou ou offline
       }
-
-      if (paginationToken) {
-        lastFetchHadMorePages = true;
-      }
-      break;
     }
 
-    if (!activeProvider) {
-      throw new Error('A API externa atingiu o limite gratuito. Use o botão "Conectar com Instagram" acima para buscas 100% oficiais e gratuitas, ou use a aba "Planilha / Lista"!');
-    }
-
-    if (allComments.length > 0) {
-      const parsed = allComments
-        .map(c => {
-          const username = c.user?.username || c.owner?.username || c.username || '';
-          const commentText = c.text || c.comment || '';
-          const avatarUrl =
-            c.user?.profile_pic_url_hd ||
-            c.user?.profile_pic_url ||
-            c.owner?.profile_pic_url_hd ||
-            c.owner?.profile_pic_url ||
-            c.profile_pic_url ||
-            c.avatar ||
-            '';
-          const fullName =
-            c.user?.full_name ||
-            c.owner?.full_name ||
-            c.full_name ||
-            '';
-          return registerParticipantMeta(username, commentText, avatarUrl, fullName);
-        })
+    if (comments && comments.length > 0) {
+      const parsed = comments
+        .map(c => registerParticipantMeta(c.username, c.text, c.avatar_url, c.full_name || c.username))
         .filter(Boolean);
 
       linkCommentsInput.value = parsed.join('\n');
       lastFetchedUrl = url;
       linkPreviewBox.classList.remove('hidden');
       updateLinkCount();
+      updateWorkflowStep(2);
 
-      if (lastFetchHadMorePages) {
-        showStatusMessage(
-          fetchStatusMsg,
-          `⚠️ Foram carregados os primeiros ${parsed.length} comentários (limite de páginas por consulta). Se o post tiver mais comentários, recomendamos importar a lista completa na aba Planilha!`,
-          'info'
-        );
-      } else {
-        showStatusMessage(fetchStatusMsg, `✅ ${parsed.length} comentário(s) auditado(s) e carregado(s) com sucesso! Pronto para sortear.`, 'success');
+      showStatusMessage(fetchStatusMsg, `✅ ${parsed.length} comentário(s) extraídos com sucesso pelo ${sourceLabel}! Pronto para sortear.`, 'success');
+      if (btnDrawLink) {
+        btnDrawLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       return true;
     } else {
-      throw new Error('Nenhum comentário encontrado ou a publicação é privada.');
+      throw new Error('Não foi possível obter os comentários automaticamente pelos servidores (Local ou Nuvem). Inicie o servidor local (iniciar-servidor.bat) ou use a aba Planilha / Lista!');
     }
   } catch (err) {
     showStatusMessage(fetchStatusMsg, `⚠️ ${err.message}`, 'error');
@@ -1543,18 +934,6 @@ async function fetchCommentsFromUrl(url) {
       linkWrap.style.display = 'flex';
       linkWrap.style.flexWrap = 'wrap';
       linkWrap.style.gap = '8px';
-
-      const instaLoginBtn = document.createElement('button');
-      instaLoginBtn.type = 'button';
-      instaLoginBtn.textContent = '📸 Conectar com Instagram (Oficial)';
-      instaLoginBtn.className = 'btn-secondary';
-      instaLoginBtn.style.fontSize = '0.78rem';
-      instaLoginBtn.style.padding = '6px 12px';
-      instaLoginBtn.style.cursor = 'pointer';
-      instaLoginBtn.addEventListener('click', () => {
-        triggerInstagramLogin();
-      });
-      linkWrap.appendChild(instaLoginBtn);
 
       const sheetTabBtn = document.querySelector('.tab-btn[data-tab="tab-sheet"]');
       if (sheetTabBtn) {
@@ -1570,19 +949,6 @@ async function fetchCommentsFromUrl(url) {
         });
         linkWrap.appendChild(goSheetBtn);
       }
-
-      const rapidLink = document.createElement('a');
-      rapidLink.href = 'https://rapidapi.com/rockapis-rockapis-default/api/instagram-scraper-api2/pricing';
-      rapidLink.target = '_blank';
-      rapidLink.rel = 'noopener noreferrer';
-      rapidLink.textContent = '🔗 Ativar Plano Free na RapidAPI';
-      rapidLink.className = 'btn-secondary';
-      rapidLink.style.fontSize = '0.78rem';
-      rapidLink.style.padding = '6px 12px';
-      rapidLink.style.textDecoration = 'none';
-      rapidLink.style.display = 'inline-block';
-      linkWrap.appendChild(rapidLink);
-
       fetchStatusMsg.appendChild(linkWrap);
     }
     return false;
@@ -1595,28 +961,9 @@ async function fetchCommentsFromUrl(url) {
   }
 }
 
-if (customRapidApiKeyInput && safeStorageGet('sorteadorPro_customRapidApiKey')) {
-  customRapidApiKeyInput.value = safeStorageGet('sorteadorPro_customRapidApiKey');
-}
-
-if (btnSaveRapidApiKey) {
-  btnSaveRapidApiKey.addEventListener('click', () => {
-    const val = customRapidApiKeyInput?.value?.trim() || '';
-    if (val) {
-      safeStorageSet('sorteadorPro_customRapidApiKey', val);
-      currentRapidApiKey = val;
-      showStatusMessage(fetchStatusMsg, '✅ Chave RapidAPI salva com sucesso! Novo limite ativado.', 'success');
-    } else {
-      safeStorageRemove('sorteadorPro_customRapidApiKey');
-      currentRapidApiKey = DEFAULT_RAPIDAPI_KEY;
-      showStatusMessage(fetchStatusMsg, 'Chave redefinida para o padrão.', 'info');
-    }
-  });
-}
-
 async function checkLocalServerStatus() {
   try {
-    const r = await fetch('http://127.0.0.1:8000/api/status', { method: 'GET' }).catch(() => null);
+    const r = await fetch(`${LOCAL_SERVER_URL}/api/status`, { method: 'GET' }).catch(() => null);
     if (r && r.ok) {
       const d = await r.json();
       if (d && d.status === 'online') {
@@ -1630,17 +977,22 @@ async function checkLocalServerStatus() {
   } catch (e) {}
 
   try {
-    const rCloud = await fetch('https://sorteador-lx.onrender.com/api/status', { method: 'GET' }).catch(() => null);
+    const rCloud = await fetch(`${CLOUD_SERVER_URL}/api/status`, { method: 'GET' }).catch(() => null);
     if (rCloud && rCloud.ok) {
       const dCloud = await rCloud.json();
       if (dCloud && dCloud.status === 'online') {
         if (localServerBadge) {
-          localServerBadge.textContent = '☁️ Servidor Nuvem Ativo 24h';
+          localServerBadge.textContent = '☁️ Servidor Nuvem Ativo (24h)';
           localServerBadge.classList.remove('hidden');
         }
+        return;
       }
     }
   } catch (e) {}
+
+  if (localServerBadge) {
+    localServerBadge.classList.add('hidden');
+  }
 }
 checkLocalServerStatus();
 
