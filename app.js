@@ -1398,7 +1398,39 @@ async function fetchCommentsFromUrl(url) {
         }
       }
     } catch (localErr) {
-      // Servidor local offline, segue para os provedores alternativos
+      // Servidor local offline, tenta nuvem Render
+    }
+
+    // 0.2 Se o Servidor na Nuvem (Render) estiver ativo, tenta extrair por ele
+    try {
+      showStatusMessage(fetchStatusMsg, 'Tentando extrair comentários via Servidor Nuvem (Render 24h)...', 'info');
+      const cloudResp = await fetch(`https://sorteador-lx.onrender.com/api/comments?url=${encodeURIComponent(url)}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      }).catch(() => null);
+
+      if (cloudResp && cloudResp.ok) {
+        const cloudData = await cloudResp.json();
+        if (cloudData && cloudData.success && Array.isArray(cloudData.comments) && cloudData.comments.length > 0) {
+          const parsed = cloudData.comments
+            .map(c => registerParticipantMeta(c.username, c.text, c.avatar_url, c.full_name || c.username))
+            .filter(Boolean);
+
+          linkCommentsInput.value = parsed.join('\n');
+          lastFetchedUrl = url;
+          linkPreviewBox.classList.remove('hidden');
+          updateLinkCount();
+          updateWorkflowStep(2);
+
+          showStatusMessage(fetchStatusMsg, `✅ ${parsed.length} comentário(s) extraídos com sucesso pelo Servidor na Nuvem (24h)! Pronto para sortear.`, 'success');
+          if (btnDrawLink) {
+            btnDrawLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return true;
+        }
+      }
+    } catch (cloudErr) {
+      // Servidor nuvem offline, segue para os provedores alternativos
     }
 
     for (const provider of RAPIDAPI_PROVIDERS) {
@@ -1588,7 +1620,24 @@ async function checkLocalServerStatus() {
     if (r && r.ok) {
       const d = await r.json();
       if (d && d.status === 'online') {
-        if (localServerBadge) localServerBadge.classList.remove('hidden');
+        if (localServerBadge) {
+          localServerBadge.textContent = '🟢 Servidor Local Ativo';
+          localServerBadge.classList.remove('hidden');
+        }
+        return;
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const rCloud = await fetch('https://sorteador-lx.onrender.com/api/status', { method: 'GET' }).catch(() => null);
+    if (rCloud && rCloud.ok) {
+      const dCloud = await rCloud.json();
+      if (dCloud && dCloud.status === 'online') {
+        if (localServerBadge) {
+          localServerBadge.textContent = '☁️ Servidor Nuvem Ativo 24h';
+          localServerBadge.classList.remove('hidden');
+        }
       }
     }
   } catch (e) {}

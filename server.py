@@ -22,7 +22,7 @@ if sys.platform.startswith('win'):
     except Exception:
         pass
 
-PORT = 8000
+PORT = int(os.environ.get('PORT', 8000))
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def extract_shortcode(url_or_code):
@@ -204,7 +204,7 @@ class SorteadorHandler(SimpleHTTPRequestHandler):
             }).encode('utf-8'))
 
 def run_server():
-    server_address = ('127.0.0.1', PORT)
+    server_address = ('0.0.0.0', PORT)
     httpd = HTTPServer(server_address, SorteadorHandler)
     print("=" * 60)
     print("  SORTEADOR WEB - SERVIDOR LOCAL PROPRIO INICIADO")
