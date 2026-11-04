@@ -152,7 +152,10 @@
         <div class="link-fetch-card">
           <div class="link-header">
             <label for="post-url">🔗 Cole o link da postagem do Instagram:</label>
-            <span class="network-badge" id="detected-network">Aguardando link...</span>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span id="local-server-badge" class="local-server-badge hidden" title="Servidor local ativo na porta 8000">🟢 Servidor Próprio Ativo</span>
+              <span class="network-badge" id="detected-network">Aguardando link...</span>
+            </div>
           </div>
           <div class="input-with-button">
             <input
@@ -167,6 +170,17 @@
             </button>
           </div>
           <small class="hint">⚡ <strong>100% Automático &amp; Sem Burocracia:</strong> Cole o link de qualquer post ou Reels público do Instagram para carregar os participantes.</small>
+          
+          <!-- Chave Personalizada RapidAPI (Caso atinja o limite público) -->
+          <details class="rapidapi-key-accordion" id="rapidapi-key-accordion" style="margin-top: 10px;">
+            <summary style="font-size: 0.78rem; color: #94a3b8; cursor: pointer; user-select: none;">🔑 Adicionar minha própria Chave Gratuita da RapidAPI</summary>
+            <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center;">
+              <input type="password" id="custom-rapidapi-key" placeholder="Cole sua chave X-RapidAPI-Key aqui..." style="flex: 1; padding: 7px 10px; font-size: 0.8rem; border-radius: 8px; background: rgba(15,23,42,0.8); border: 1px solid rgba(255,255,255,0.15); color: #fff;">
+              <button type="button" id="btn-save-rapidapi-key" class="btn-top-action" style="font-size: 0.78rem; padding: 7px 14px; cursor: pointer;">Salvar Chave</button>
+            </div>
+            <small style="color: #64748b; font-size: 0.74rem; display: block; margin-top: 4px;">Você pode gerar uma chave gratuita em 30 segundos no site rapidapi.com (sem pagar nada).</small>
+          </details>
+
           <div id="fetch-status-msg" class="fetch-status-msg hidden" role="status" aria-live="polite"></div>
         </div>
 

@@ -2,6 +2,7 @@
 // CONFIGURAÇÃO INTEGRADA DA API (Multi-Provedor RapidAPI)
 // ==========================================
 const DEFAULT_RAPIDAPI_KEY = '33f3227ee8msh6818ae7d446c656p1a527ejsn067883af0870';
+let currentRapidApiKey = safeStorageGet('sorteadorPro_customRapidApiKey') || DEFAULT_RAPIDAPI_KEY;
 const RAPIDAPI_PROVIDERS = [
   {
     name: 'Instagram Scraper Stable API',
@@ -225,6 +226,9 @@ const btnFetchComments = document.getElementById('btn-fetch-comments');
 const btnFetchText = document.getElementById('btn-fetch-text');
 const fetchSpinner = document.getElementById('fetch-spinner');
 const fetchStatusMsg = document.getElementById('fetch-status-msg');
+const customRapidApiKeyInput = document.getElementById('custom-rapidapi-key');
+const btnSaveRapidApiKey = document.getElementById('btn-save-rapidapi-key');
+const localServerBadge = document.getElementById('local-server-badge');
 const linkPreviewBox = document.getElementById('link-preview-box');
 const linkCommentsInput = document.getElementById('link-comments-input');
 const linkLinesCountBadge = document.getElementById('link-lines-count');
@@ -1365,11 +1369,43 @@ async function fetchCommentsFromUrl(url) {
       if (ok) return true;
     }
 
+    // 0. Se o Servidor Próprio Local estiver ativo, tenta extrair diretamente por ele
+    try {
+      showStatusMessage(fetchStatusMsg, 'Tentando extrair comentários via Servidor Local Próprio...', 'info');
+      const localResp = await fetch(`http://127.0.0.1:8000/api/comments?url=${encodeURIComponent(url)}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      }).catch(() => null);
+
+      if (localResp && localResp.ok) {
+        const localData = await localResp.json();
+        if (localData && localData.success && Array.isArray(localData.comments) && localData.comments.length > 0) {
+          const parsed = localData.comments
+            .map(c => registerParticipantMeta(c.username, c.text, c.avatar_url, c.full_name || c.username))
+            .filter(Boolean);
+
+          linkCommentsInput.value = parsed.join('\n');
+          lastFetchedUrl = url;
+          linkPreviewBox.classList.remove('hidden');
+          updateLinkCount();
+          updateWorkflowStep(2);
+
+          showStatusMessage(fetchStatusMsg, `✅ ${parsed.length} comentário(s) extraídos com sucesso pelo seu Servidor Local Próprio! Pronto para sortear.`, 'success');
+          if (btnDrawLink) {
+            btnDrawLink.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return true;
+        }
+      }
+    } catch (localErr) {
+      // Servidor local offline, segue para os provedores alternativos
+    }
+
     for (const provider of RAPIDAPI_PROVIDERS) {
       const firstResponse = await fetch(provider.buildUrl(shortcode, url, null), {
         method: 'GET',
         headers: {
-          'x-rapidapi-key': DEFAULT_RAPIDAPI_KEY,
+          'x-rapidapi-key': currentRapidApiKey,
           'x-rapidapi-host': provider.host
         }
       });
@@ -1399,7 +1435,7 @@ async function fetchCommentsFromUrl(url) {
         const nextResp = await fetch(activeProvider.buildUrl(shortcode, url, paginationToken), {
           method: 'GET',
           headers: {
-            'x-rapidapi-key': DEFAULT_RAPIDAPI_KEY,
+            'x-rapidapi-key': currentRapidApiKey,
             'x-rapidapi-host': activeProvider.host
           }
         });
@@ -1526,6 +1562,38 @@ async function fetchCommentsFromUrl(url) {
     btnDrawLink.disabled = false;
   }
 }
+
+if (customRapidApiKeyInput && safeStorageGet('sorteadorPro_customRapidApiKey')) {
+  customRapidApiKeyInput.value = safeStorageGet('sorteadorPro_customRapidApiKey');
+}
+
+if (btnSaveRapidApiKey) {
+  btnSaveRapidApiKey.addEventListener('click', () => {
+    const val = customRapidApiKeyInput?.value?.trim() || '';
+    if (val) {
+      safeStorageSet('sorteadorPro_customRapidApiKey', val);
+      currentRapidApiKey = val;
+      showStatusMessage(fetchStatusMsg, '✅ Chave RapidAPI salva com sucesso! Novo limite ativado.', 'success');
+    } else {
+      safeStorageRemove('sorteadorPro_customRapidApiKey');
+      currentRapidApiKey = DEFAULT_RAPIDAPI_KEY;
+      showStatusMessage(fetchStatusMsg, 'Chave redefinida para o padrão.', 'info');
+    }
+  });
+}
+
+async function checkLocalServerStatus() {
+  try {
+    const r = await fetch('http://127.0.0.1:8000/api/status', { method: 'GET' }).catch(() => null);
+    if (r && r.ok) {
+      const d = await r.json();
+      if (d && d.status === 'online') {
+        if (localServerBadge) localServerBadge.classList.remove('hidden');
+      }
+    }
+  } catch (e) {}
+}
+checkLocalServerStatus();
 
 btnFetchComments.addEventListener('click', () => {
   fetchCommentsFromUrl(postUrlInput.value.trim());
