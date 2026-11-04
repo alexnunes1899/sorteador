@@ -1,0 +1,174 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c0e1e"/>
+      <stop offset="50%" stop-color="#181338"/>
+      <stop offset="100%" stop-color="#2a0f3d"/>
+    </linearGradient>
+    <radialGradient id="topGlow" cx="30%" cy="20%" r="60%">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="goldGlow" cx="50%" cy="52%" r="45%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Border Gradient -->
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.9"/>
+      <stop offset="50%" stop-color="#ec4899" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#6366f1" stop-opacity="0.8"/>
+    </linearGradient>
+
+    <!-- 3D Gold Die Gradients -->
+    <!-- Top Face (Brightest) -->
+    <linearGradient id="topFace" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#fffbeb"/>
+      <stop offset="35%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <!-- Left Face (Mid Tone) -->
+    <linearGradient id="leftFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="70%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <!-- Right Face (Deep Shadow + Purple Bounce Light) -->
+    <linearGradient id="rightFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b45309"/>
+      <stop offset="60%" stop-color="#78350f"/>
+      <stop offset="100%" stop-color="#4c1d95"/>
+    </linearGradient>
+
+    <!-- Pip / Dot Gradient -->
+    <radialGradient id="pipTop" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#78350f"/>
+      <stop offset="85%" stop-color="#451a03"/>
+      <stop offset="100%" stop-color="#1e0c03"/>
+    </radialGradient>
+    <radialGradient id="pipLeft" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#fffbeb"/>
+      <stop offset="60%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </radialGradient>
+
+    <!-- Star Glow -->
+    <radialGradient id="starGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="40%" stop-color="#fde68a"/>
+      <stop offset="100%" stop-color="#fde68a" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Drop Shadows -->
+    <filter id="shadowDie" x="-20%" y="-20%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000000" flood-opacity="0.65"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#b45309" flood-opacity="0.35"/>
+    </filter>
+    <filter id="glowSparkle" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Base with Glow -->
+  <rect x="18" y="18" width="476" height="476" rx="112" fill="url(#bgGrad)"/>
+  <rect x="18" y="18" width="476" height="476" rx="112" fill="url(#topGlow)"/>
+  <rect x="18" y="18" width="476" height="476" rx="112" fill="url(#goldGlow)"/>
+  <rect x="18" y="18" width="476" height="476" rx="112" fill="none" stroke="url(#borderGrad)" stroke-width="7"/>
+
+  <!-- 3D Isometric Golden Die (Sorteador Pro) -->
+  <g filter="url(#shadowDie)">
+    <!-- Top Face (Diamond Perspective) -->
+    <!-- Center vertex: (256, 252), Top: (256, 126), Left: (138, 194), Right: (374, 194) -->
+    <path d="M 256,128 
+             C 262,125 270,128 274,131
+             L 370,188
+             C 376,191 378,198 375,203
+             L 262,258
+             C 258,260 254,260 250,258
+             L 137,203
+             C 134,198 136,191 142,188
+             L 238,131
+             C 242,128 250,125 256,128 Z"
+          fill="url(#topFace)"/>
+
+    <!-- Left Face -->
+    <!-- Vertices: (138, 194) to (256, 252) down to (256, 388) and (138, 330) -->
+    <path d="M 137,203
+             C 136,206 136,210 136,214
+             L 136,326
+             C 136,334 141,340 148,344
+             L 248,397
+             C 253,400 256,398 256,392
+             L 256,260
+             C 256,258 253,257 250,258
+             L 137,203 Z"
+          fill="url(#leftFace)"/>
+
+    <!-- Right Face -->
+    <!-- Vertices: (256, 252) to (374, 194) down to (374, 330) and (256, 388) -->
+    <path d="M 256,260
+             C 256,257 259,258 262,258
+             L 375,203
+             C 377,207 376,210 376,214
+             L 376,326
+             C 376,334 371,340 364,344
+             L 264,397
+             C 259,400 256,398 256,392
+             L 256,260 Z"
+          fill="url(#rightFace)"/>
+  </g>
+
+  <!-- Pips (Dots on Die) -->
+  <!-- Top Face: Pip in Center + diagonal (3 pips) -->
+  <!-- Center Pip on Top Face -->
+  <ellipse cx="256" cy="193" rx="14" ry="8" fill="url(#pipTop)"/>
+  <!-- Front-Left Pip on Top Face -->
+  <ellipse cx="204" cy="219" rx="13" ry="7.5" fill="url(#pipTop)"/>
+  <!-- Back-Right Pip on Top Face -->
+  <ellipse cx="308" cy="167" rx="13" ry="7.5" fill="url(#pipTop)"/>
+
+  <!-- Left Face Pips (5 pips representation with bright inset) -->
+  <!-- Center Pip -->
+  <ellipse cx="196" cy="304" rx="9" ry="16" transform="rotate(-15 196 304)" fill="url(#pipLeft)"/>
+  <!-- Top-Left Pip -->
+  <ellipse cx="166" cy="254" rx="8" ry="14" transform="rotate(-15 166 254)" fill="url(#pipLeft)"/>
+  <!-- Top-Right Pip -->
+  <ellipse cx="226" cy="276" rx="8" ry="14" transform="rotate(-15 226 276)" fill="url(#pipLeft)"/>
+  <!-- Bottom-Left Pip -->
+  <ellipse cx="166" cy="336" rx="8" ry="14" transform="rotate(-15 166 336)" fill="url(#pipLeft)"/>
+  <!-- Bottom-Right Pip -->
+  <ellipse cx="226" cy="358" rx="8" ry="14" transform="rotate(-15 226 358)" fill="url(#pipLeft)"/>
+
+  <!-- Right Face Pips (2 pips representation with bright inset) -->
+  <ellipse cx="298" cy="282" rx="8" ry="14" transform="rotate(15 298 282)" fill="url(#pipLeft)"/>
+  <ellipse cx="338" cy="344" rx="8" ry="14" transform="rotate(15 338 344)" fill="url(#pipLeft)"/>
+
+  <!-- Sparkling Stars & Magic Fair-Play Accents -->
+  <!-- Top-Right Large Star -->
+  <g filter="url(#glowSparkle)" transform="translate(388, 108)">
+    <path d="M 0,-32 Q 3,-6 32,0 Q 3,6 0,32 Q -3,6 -32,0 Q -3,-6 0,-32 Z" fill="#ffffff"/>
+    <circle cx="0" cy="0" r="7" fill="#fde68a"/>
+  </g>
+
+  <!-- Left Small Star -->
+  <g filter="url(#glowSparkle)" transform="translate(108, 142)">
+    <path d="M 0,-18 Q 2,-4 18,0 Q 2,4 0,18 Q -2,4 -18,0 Q -2,-4 0,-18 Z" fill="#fde68a"/>
+    <circle cx="0" cy="0" r="4" fill="#ffffff"/>
+  </g>
+
+  <!-- Bottom-Right Medium Star -->
+  <g filter="url(#glowSparkle)" transform="translate(408, 388)">
+    <path d="M 0,-22 Q 2,-4 22,0 Q 2,4 0,22 Q -2,4 -22,0 Q -2,-4 0,-22 Z" fill="#f472b6"/>
+    <circle cx="0" cy="0" r="5" fill="#ffffff"/>
+  </g>
+
+  <!-- Little sparkle dots -->
+  <circle cx="340" cy="95" r="3.5" fill="#fde68a" opacity="0.9"/>
+  <circle cx="436" cy="180" r="4" fill="#a5b4fc" opacity="0.85"/>
+  <circle cx="86" cy="235" r="3" fill="#fde68a" opacity="0.8"/>
+  <circle cx="120" cy="385" r="4" fill="#67e8f9" opacity="0.85"/>
+  <circle cx="256" cy="452" r="3.5" fill="#fde68a" opacity="0.8"/>
+</svg>
