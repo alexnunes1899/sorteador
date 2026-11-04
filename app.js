@@ -183,8 +183,7 @@ function stripInvisibleChars(str) {
 const tabBtns = document.querySelectorAll('.tab-btn');
 const tabContents = document.querySelectorAll('.tab-content');
 
-// Ações do Topo (Demo, Histórico & Modo Live Tela Cheia)
-const btnLoadDemo = document.getElementById('btn-load-demo');
+// Ações do Topo (Histórico & Modo Live Tela Cheia)
 const btnOpenHistory = document.getElementById('btn-open-history');
 const historyCountBadge = document.getElementById('history-count-badge');
 const btnFullscreen = document.getElementById('btn-fullscreen');
@@ -210,6 +209,7 @@ const drawDurationSelect = document.getElementById('draw-duration-select');
 // Aba 1: Conexão Oficial Instagram (Meta Graph API) & Link
 const DEFAULT_META_APP_ID = '1191736836515840';
 const btnInstaConnect = document.getElementById('btn-insta-connect');
+const btnFbConnectAlt = document.getElementById('btn-fb-connect-alt');
 const instaConnectedBox = document.getElementById('insta-connected-box');
 const instaProfileAvatar = document.getElementById('insta-profile-avatar');
 const instaProfileHandle = document.getElementById('insta-profile-handle');
@@ -803,78 +803,6 @@ function updateWorkflowStep(stepNum) {
   });
 }
 
-function loadDemoData() {
-  if (isGeneratingVideo) return;
-  // 1. Muda título
-  giveawayTitleInput.value = 'Sorteio Especial iPhone 16 #Demo';
-  if (resultTitleEditInput) resultTitleEditInput.value = 'Sorteio Especial iPhone 16 #Demo';
-
-  // 2. Ativa a aba Planilha / Lista
-  const sheetTabBtn = document.querySelector('.tab-btn[data-tab="tab-sheet"]');
-  if (sheetTabBtn) {
-    sheetTabBtn.click();
-  }
-
-  // 3. Define regras do sorteio
-  if (sheetWinnersCountInput) sheetWinnersCountInput.value = '1';
-  if (sheetSubstitutesCountInput) sheetSubstitutesCountInput.value = '2';
-
-  // 4. Cria avatares em canvas para os participantes da demo
-  const demoUsers = [
-    { u: 'mariasilva_oficial', name: 'Maria Silva', c: 'Quero muito ganhar esse iPhone! @amiga1 @amiga2', color: '#ec4899' },
-    { u: 'joaopaulo_tech', name: 'João Paulo', c: 'Participando com certeza! @tech_br @amigo_dev', color: '#3b82f6' },
-    { u: 'beatriz.lima', name: 'Beatriz Lima', c: 'Já é meu esse prêmio! @bia_sister @carol.m', color: '#8b5cf6' },
-    { u: 'lucas_mendes99', name: 'Lucas Mendes', c: 'Torcendo demais aqui @pedro_h @marcos.s', color: '#10b981' },
-    { u: 'camila_rocha', name: 'Camila Rocha', c: 'Top! Adorei as regras @julia_p @renata_c', color: '#f59e0b' },
-    { u: 'rafael_almeida', name: 'Rafael Almeida', c: 'Bora ganhar! @irmao_leo @gabriel.v', color: '#06b6d4' },
-    { u: 'fernanda.costa', name: 'Fernanda Costa', c: 'Seguindo todas as regras com carinho @mae_coruja', color: '#f43f5e' },
-    { u: 'thiago_santana', name: 'Thiago Santana', c: 'Sensacional esse sorteio! @amigo_luiz @ana.clara', color: '#14b8a6' },
-    { u: 'larissa_souza', name: 'Larissa Souza', c: 'Eu mereço esse prêmio maravilhoso @mariana_b', color: '#6366f1' },
-    { u: 'diego_oliveira', name: 'Diego Oliveira', c: 'Participei! Valeu pelo sorteio @paulinho_9', color: '#eab308' }
-  ];
-
-  const demoLines = demoUsers.map((u) => {
-    let avatarUri = '';
-    try {
-      const cvs = document.createElement('canvas');
-      cvs.width = 120;
-      cvs.height = 120;
-      const ctx = cvs.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = u.color;
-        ctx.beginPath();
-        ctx.arc(60, 60, 60, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 44px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        const initials = u.name.split(' ').map(n => n[0]).join('').slice(0, 2);
-        ctx.fillText(initials, 60, 64);
-      }
-      avatarUri = cvs.toDataURL('image/png');
-    } catch (e) {
-      avatarUri = '';
-    }
-    return registerParticipantMeta(u.u, u.c, avatarUri, u.name);
-  });
-
-  namesInput.value = demoLines.join('\n');
-  updateSheetCount();
-  updateWorkflowStep(2);
-
-  if (sheetStatusMsg) {
-    showStatusMessage(sheetStatusMsg, '✨ 10 participantes de demonstração carregados com fotos e comentários! Clique em "Realizar Sorteio" abaixo para testar.', 'success');
-  }
-
-  if (btnDrawSheet) {
-    btnDrawSheet.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-}
-
-if (btnLoadDemo) {
-  btnLoadDemo.addEventListener('click', loadDemoData);
-}
 
 navPillBtns.forEach(btn => {
   btn.addEventListener('click', () => {
@@ -895,59 +823,161 @@ let connectedIgAccount = null;
 let currentIgPosts = [];
 let selectedIgMediaId = null;
 
-function initFacebookSdk(appId = DEFAULT_META_APP_ID) {
-  return new Promise((resolve) => {
-    if (window.FB) {
-      resolve(window.FB);
-      return;
-    }
-    window.fbAsyncInit = function() {
-      if (window.FB && typeof window.FB.init === 'function') {
-        window.FB.init({
-          appId: appId,
-          cookie: true,
-          xfbml: false,
-          version: 'v20.0'
-        });
-        resolve(window.FB);
-      }
-    };
+// Abre login direto no INSTAGRAM (www.instagram.com)
+function triggerInstagramLogin() {
+  const appId = DEFAULT_META_APP_ID;
+  let redirectUri = 'https://alexnunes1899.github.io/sorteador/';
+  if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    redirectUri = window.location.href.split('#')[0].split('?')[0];
+  }
 
-    if (document.querySelector('script[data-meta-sdk="true"]')) {
-      return;
-    }
-    const js = document.createElement('script');
-    js.setAttribute('data-meta-sdk', 'true');
-    js.id = 'facebook-jssdk';
-    js.src = 'https://connect.facebook.net/pt_BR/sdk.js';
-    js.async = true;
-    js.defer = true;
-    js.crossOrigin = 'anonymous';
-    document.body.appendChild(js);
-  });
+  // Escopos oficiais do Instagram para Criadores e Profissionais
+  const scopes = 'instagram_business_basic,instagram_business_manage_comments';
+  const oauthUrl = `https://www.instagram.com/oauth/authorize?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code`;
+
+  showStatusMessage(fetchStatusMsg, 'Abrindo janela oficial do Instagram (instagram.com)...', 'info');
+  openAuthPopup(oauthUrl, 'InstagramLogin');
 }
 
-async function triggerInstagramLogin() {
-  try {
-    showStatusMessage(fetchStatusMsg, 'Iniciando autenticação oficial com a Meta...', 'info');
-    const FB = await initFacebookSdk();
-    if (!FB) {
-      throw new Error('Não foi possível carregar o SDK da Meta. Se o pop-up estiver bloqueado, cole o Token manualmente na opção abaixo!');
-    }
-
-    FB.login((response) => {
-      if (response.authResponse && response.authResponse.accessToken) {
-        handleMetaAccessToken(response.authResponse.accessToken);
-      } else {
-        showStatusMessage(fetchStatusMsg, 'Conexão cancelada ou não autorizada pela Meta.', 'info');
-      }
-    }, {
-      scope: 'instagram_basic,instagram_manage_comments,pages_show_list,pages_read_engagement',
-      return_scopes: true
-    });
-  } catch (err) {
-    showStatusMessage(fetchStatusMsg, `⚠️ ${err.message}`, 'error');
+// Abre login alternativo via Facebook (para Páginas com Instagram vinculado)
+function triggerFacebookLogin() {
+  const appId = DEFAULT_META_APP_ID;
+  let redirectUri = 'https://alexnunes1899.github.io/sorteador/';
+  if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+    redirectUri = window.location.href.split('#')[0].split('?')[0];
   }
+
+  const scopes = 'instagram_basic,instagram_manage_comments,pages_show_list,pages_read_engagement';
+  const oauthUrl = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${encodeURIComponent(appId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=token&display=popup`;
+
+  showStatusMessage(fetchStatusMsg, 'Abrindo login via Facebook (Meta Graph API)...', 'info');
+  openAuthPopup(oauthUrl, 'MetaFacebookLogin');
+}
+
+function openAuthPopup(oauthUrl, windowName) {
+  const width = 640;
+  const height = 720;
+  const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+  const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+
+  let popup = null;
+  try {
+    popup = window.open(
+      oauthUrl,
+      windowName,
+      `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,status=yes,resizable=yes`
+    );
+  } catch (e) {
+    popup = null;
+  }
+
+  if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+    showStatusMessage(fetchStatusMsg, '⚠️ O navegador bloqueou a janela pop-up. Redirecionando na mesma aba...', 'info');
+    window.location.href = oauthUrl;
+    return;
+  }
+
+  let pollTimer = setInterval(() => {
+    try {
+      if (!popup || popup.closed) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+        return;
+      }
+
+      let currentHref = '';
+      try {
+        currentHref = popup.location.href;
+      } catch (crossErr) {
+        // Cross-origin normal enquanto o usuário navega em instagram.com ou facebook.com
+        return;
+      }
+
+      if (currentHref && (currentHref.includes('code=') || currentHref.includes('access_token=') || currentHref.includes('error='))) {
+        const hash = popup.location.hash || '';
+        const search = popup.location.search || '';
+        const params = new URLSearchParams(
+          (search.startsWith('?') ? search.substring(1) : search) ||
+          (hash.startsWith('#') ? hash.substring(1) : hash)
+        );
+
+        const code = params.get('code');
+        const token = params.get('access_token');
+        const errorDesc = params.get('error_description') || params.get('error');
+
+        clearInterval(pollTimer);
+        pollTimer = null;
+        try { popup.close(); } catch (e) {}
+
+        if (code) {
+          handleInstagramAuthCode(code.replace(/#_$/, ''));
+        } else if (token) {
+          handleMetaAccessToken(token);
+        } else if (errorDesc) {
+          showStatusMessage(fetchStatusMsg, `⚠️ Autorização cancelada ou recusada: ${decodeURIComponent(errorDesc)}`, 'error');
+        }
+      }
+    } catch (e) {
+      // Ignora erro cross-origin
+    }
+  }, 500);
+}
+
+// Escuta mensagens postMessage caso a página abra e redirecione dentro da janela
+window.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'INSTA_AUTH_CODE' && event.data.code) {
+    handleInstagramAuthCode(event.data.code);
+  }
+  if (event.data && event.data.type === 'META_AUTH_TOKEN' && event.data.token) {
+    handleMetaAccessToken(event.data.token);
+  }
+});
+
+function checkUrlForMetaToken() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const token = hashParams.get('access_token');
+
+  if (window.opener) {
+    if (code) {
+      try {
+        window.opener.postMessage({ type: 'INSTA_AUTH_CODE', code: code.replace(/#_$/, '') }, '*');
+        window.close();
+        return;
+      } catch (e) {}
+    }
+    if (token) {
+      try {
+        window.opener.postMessage({ type: 'META_AUTH_TOKEN', token }, '*');
+        window.close();
+        return;
+      } catch (e) {}
+    }
+  }
+
+  if (code) {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+    }
+    handleInstagramAuthCode(code.replace(/#_$/, ''));
+  } else if (token) {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+    }
+    handleMetaAccessToken(token);
+  }
+}
+
+async function handleInstagramAuthCode(code) {
+  if (!code) return;
+  const cleanCode = code.replace(/#_$/, '');
+  safeStorageSet('sorteadorPro_instaAuthCode', cleanCode);
+  showStatusMessage(fetchStatusMsg, '✅ Conta do Instagram autorizada com sucesso! Conectada!', 'success');
+
+  if (instaConnectedBox) instaConnectedBox.classList.remove('hidden');
+  if (instaProfileHandle) instaProfileHandle.textContent = 'Conta Instagram Conectada';
+  if (instaProfileSubtitle) instaProfileSubtitle.textContent = 'Login Oficial Concluído • Selecione um post ou cole o link abaixo';
 }
 
 async function handleMetaAccessToken(token) {
@@ -1211,6 +1241,9 @@ function disconnectInstagram() {
 if (btnInstaConnect) {
   btnInstaConnect.addEventListener('click', triggerInstagramLogin);
 }
+if (btnFbConnectAlt) {
+  btnFbConnectAlt.addEventListener('click', triggerFacebookLogin);
+}
 if (btnInstaLogout) {
   btnInstaLogout.addEventListener('click', disconnectInstagram);
 }
@@ -1221,6 +1254,9 @@ if (btnRefreshInstaPosts) {
     }
   });
 }
+
+// Verifica se a página recebeu access_token no redirecionamento OAuth
+checkUrlForMetaToken();
 
 // Restaura sessão se houver token salvo
 if (currentMetaAccessToken) {
