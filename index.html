@@ -8,24 +8,43 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <!-- SheetJS (Leitura nativa de Excel .xlsx / .xls) -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-  <!-- Canvas Confetti CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" defer></script>
+  <!-- SheetJS (Leitura nativa de Excel .xlsx / .xls com verificação de integridade SRI) -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
+    integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"
+    crossorigin="anonymous"
+    defer
+  ></script>
+  <!-- Canvas Confetti CDN (com verificação de integridade SRI) -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"
+    integrity="sha384-HAH79XdRvHr6axVGh4xQWVCp14kcd32bNk4Xu0sHDHtFQ42n6BAM8ykvB47dGz6D"
+    crossorigin="anonymous"
+    defer
+  ></script>
 </head>
 <body>
   <div class="background-glow glow-1"></div>
   <div class="background-glow glow-2"></div>
 
   <div class="container">
-    <!-- Header -->
-    <header class="header">
+    <!-- Header + Barra de Ações Rápidas (Histórico e Modo Live) -->
+    <header class="header header-with-actions">
       <div class="logo">
         <span class="logo-icon">🎲</span>
         <div class="logo-text">
           <h1>Sorteador<span>Pro</span></h1>
           <p>Sorteios oficiais por Link, Planilha e Números</p>
         </div>
+      </div>
+
+      <div class="header-actions">
+        <button type="button" id="btn-open-history" class="btn-top-action" title="Ver sorteios anteriores salvos neste dispositivo">
+          📜 Histórico <span id="history-count-badge" class="mini-count-pill hidden">0</span>
+        </button>
+        <button type="button" id="btn-fullscreen" class="btn-top-action" title="Ativar Tela Cheia para transmissão em Live">
+          📺 Modo Live
+        </button>
       </div>
     </header>
 
@@ -48,18 +67,30 @@
     <!-- Main Card -->
     <main class="main-card">
 
-      <!-- Nome / Identificação do Sorteio (Compartilhado entre as abas) -->
+      <!-- Nome do Sorteio + Tempo de Suspense (Compartilhado entre as abas) -->
       <div id="giveaway-meta-box" class="giveaway-meta-box">
-        <label for="giveaway-title">🏷️ Nome do Sorteio <span class="optional-tag">(identificação no resultado e na arte)</span></label>
-        <input
-          type="text"
-          id="giveaway-title"
-          maxlength="80"
-          placeholder="Ex: Sorteio iPhone 16 / Kit Beleza / Rifa Especial #01"
-          autocomplete="off"
-        >
+        <div class="meta-grid">
+          <div class="meta-title-col">
+            <label for="giveaway-title">🏷️ Nome do Sorteio <span class="optional-tag">(identificação no resultado, arte e PDF)</span></label>
+            <input
+              type="text"
+              id="giveaway-title"
+              maxlength="80"
+              placeholder="Ex: Sorteio iPhone 16 / Kit Beleza / Rifa Especial #01"
+              autocomplete="off"
+            >
+          </div>
+          <div class="meta-duration-col">
+            <label for="draw-duration-select">⏱️ Suspense da Roleta</label>
+            <select id="draw-duration-select" class="styled-select">
+              <option value="2500" selected>⚡ Rápido (2,5s)</option>
+              <option value="5000">🎲 Normal (5s)</option>
+              <option value="10000">🔥 Suspense Live (10s)</option>
+            </select>
+          </div>
+        </div>
       </div>
-      
+
       <!-- ========================================== -->
       <!-- ABA 1: SORTEIO DIRETO POR LINK             -->
       <!-- ========================================== -->
@@ -70,10 +101,10 @@
             <span class="network-badge" id="detected-network">Aguardando link...</span>
           </div>
           <div class="input-with-button">
-            <input 
-              type="url" 
-              id="post-url" 
-              placeholder="https://www.instagram.com/p/C-xyz123..." 
+            <input
+              type="url"
+              id="post-url"
+              placeholder="https://www.instagram.com/p/C-xyz123..."
               autocomplete="off"
             >
             <button type="button" id="btn-fetch-comments" class="btn-fetch">
@@ -120,14 +151,36 @@
             </label>
           </div>
 
-          <div class="option-card">
-            <label class="switch-container">
-              <input type="checkbox" id="link-require-mention">
-              <span class="checkmark"></span>
-              <span class="opt-label">Exigir marcação de amigo com @</span>
-            </label>
+          <div class="option-card select-option-card">
+            <div class="option-info">
+              <label for="link-min-mentions" class="opt-title">👥 Marcação de Amigos (@)</label>
+              <span class="opt-desc">Amigos diferentes no comentário</span>
+            </div>
+            <select id="link-min-mentions" class="compact-select">
+              <option value="0" selected>Sem exigir @</option>
+              <option value="1">Mín. 1 @amigo</option>
+              <option value="2">Mín. 2 @amigos</option>
+              <option value="3">Mín. 3 @amigos</option>
+            </select>
           </div>
         </div>
+
+        <!-- Regras Avançadas Opcionais (Aba Link) -->
+        <details class="advanced-filters-panel" id="link-advanced-details">
+          <summary>⚙️ Regras Avançadas Opcionais <span class="optional-tag">(Palavra-chave / Hashtag e Bloqueados)</span></summary>
+          <div class="advanced-filters-grid">
+            <div class="adv-field">
+              <label for="link-keyword-filter">🔑 Exigir Palavra-chave ou Hashtag:</label>
+              <input type="text" id="link-keyword-filter" maxlength="60" placeholder="Ex: EU QUERO ou #Sorteio" autocomplete="off">
+              <small>Só participam comentários contendo este termo.</small>
+            </div>
+            <div class="adv-field">
+              <label for="link-blacklist">🚫 Bloquear Perfis (Equipe / Loja):</label>
+              <input type="text" id="link-blacklist" placeholder="Ex: @minhaloja, @socio1, @funcionario" autocomplete="off">
+              <small>Separe os @perfis bloqueados por vírgula ou espaço.</small>
+            </div>
+          </div>
+        </details>
 
         <button type="button" id="btn-draw-link" class="btn-primary">
           <span class="btn-icon">⚡</span> REALIZAR SORTEIO
@@ -160,8 +213,8 @@
               <span class="counter-badge" id="lines-count">0 participantes</span>
             </div>
           </div>
-          <textarea 
-            id="names-input" 
+          <textarea
+            id="names-input"
             placeholder="Importe uma planilha acima ou cole os participantes aqui (1 por linha):&#10;@usuario - Comentário marcando @amigo1&#10;Ou apenas o nome / @usuario"
           ></textarea>
         </div>
@@ -192,14 +245,36 @@
             </label>
           </div>
 
-          <div class="option-card">
-            <label class="switch-container">
-              <input type="checkbox" id="opt-require-mention">
-              <span class="checkmark"></span>
-              <span class="opt-label">Exigir marcação de amigo com @</span>
-            </label>
+          <div class="option-card select-option-card">
+            <div class="option-info">
+              <label for="sheet-min-mentions" class="opt-title">👥 Marcação de Amigos (@)</label>
+              <span class="opt-desc">Amigos diferentes no comentário</span>
+            </div>
+            <select id="sheet-min-mentions" class="compact-select">
+              <option value="0" selected>Sem exigir @</option>
+              <option value="1">Mín. 1 @amigo</option>
+              <option value="2">Mín. 2 @amigos</option>
+              <option value="3">Mín. 3 @amigos</option>
+            </select>
           </div>
         </div>
+
+        <!-- Regras Avançadas Opcionais (Aba Planilha) -->
+        <details class="advanced-filters-panel" id="sheet-advanced-details">
+          <summary>⚙️ Regras Avançadas Opcionais <span class="optional-tag">(Palavra-chave / Hashtag e Bloqueados)</span></summary>
+          <div class="advanced-filters-grid">
+            <div class="adv-field">
+              <label for="sheet-keyword-filter">🔑 Exigir Palavra-chave ou Hashtag:</label>
+              <input type="text" id="sheet-keyword-filter" maxlength="60" placeholder="Ex: EU QUERO ou #Sorteio" autocomplete="off">
+              <small>Só participam linhas contendo este termo.</small>
+            </div>
+            <div class="adv-field">
+              <label for="sheet-blacklist">🚫 Bloquear Perfis / Nomes:</label>
+              <input type="text" id="sheet-blacklist" placeholder="Ex: @minhaloja, @socio1, @funcionario" autocomplete="off">
+              <small>Separe os nomes/@perfis bloqueados por vírgula.</small>
+            </div>
+          </div>
+        </details>
 
         <button type="button" id="btn-draw-sheet" class="btn-primary">
           <span class="btn-icon">⚡</span> REALIZAR SORTEIO DA PLANILHA
@@ -272,16 +347,44 @@
           </div>
         </div>
 
+        <!-- Registro Auditável de Substituições (se houver desclassificação) -->
+        <div class="disqualified-log-box hidden" id="disqualified-log-box">
+          <div class="disq-log-title">📋 Registro Oficial de Substituições:</div>
+          <div class="disq-log-list" id="disqualified-log-list"></div>
+        </div>
+
+        <!-- Certificado de Auditoria Criptográfica Anti-Fraude -->
+        <div class="audit-certificate-box" id="audit-certificate-box">
+          <div class="audit-cert-header">
+            <span class="audit-shield">🔒</span>
+            <div>
+              <strong>Certificado de Auditoria Criptográfica</strong>
+              <small>Sorteio imparcial via CSPRNG (Web Crypto API) sem viés matemático</small>
+            </div>
+            <span class="audit-protocol-pill" id="audit-protocol-id">#SP-000000</span>
+          </div>
+          <div class="audit-cert-grid">
+            <div class="audit-cert-item">
+              <span class="audit-label">Base Auditada:</span>
+              <span class="audit-val" id="audit-pool-summary">—</span>
+            </div>
+            <div class="audit-cert-item">
+              <span class="audit-label">Hash SHA-256 de Verificação:</span>
+              <code class="audit-hash" id="audit-sha256-hash">Calculando assinatura...</code>
+            </div>
+          </div>
+        </div>
+
         <!-- ========================================== -->
-        <!-- GERADOR DE ARTE / TEMPLATE DO GANHADOR     -->
+        <!-- GERADOR DE ARTE & VÍDEO DO GANHADOR        -->
         <!-- ========================================== -->
         <div class="post-generator-card" id="post-generator-card">
           <div class="post-gen-header">
             <div class="post-gen-title">
-              <span>🎨 Template Pronto para Postar</span>
-              <small>Baixe a imagem oficial com nome e foto do ganhador</small>
+              <span>🎨 Arte e Vídeo Oficial para Postar</span>
+              <small>Baixe o post em imagem (PNG) ou o vídeo animado do sorteio com revelação do ganhador</small>
             </div>
-            <div class="format-toggle" role="group" aria-label="Formato da imagem">
+            <div class="format-toggle" role="group" aria-label="Formato da imagem e do vídeo">
               <button type="button" class="format-btn active" data-format="feed">📱 Feed (1:1)</button>
               <button type="button" class="format-btn" data-format="stories">📲 Stories (9:16)</button>
             </div>
@@ -289,7 +392,7 @@
 
           <!-- Seletor de Ganhador quando houver múltiplos vencedores -->
           <div id="card-winner-selector-wrap" class="card-winner-selector-wrap hidden">
-            <label for="card-winner-select">Exibir na arte:</label>
+            <label for="card-winner-select">Exibir na arte / vídeo:</label>
             <select id="card-winner-select" class="card-winner-select"></select>
           </div>
 
@@ -298,27 +401,93 @@
             <canvas id="winner-post-canvas" width="1080" height="1080"></canvas>
           </div>
 
-          <!-- Personalização rápida da Arte (Nome do Sorteio + Upload opcional de Foto) -->
+          <!-- Personalização rápida da Arte (Nome do Sorteio + Upload opcional de Foto do Ganhador) -->
           <div class="post-gen-controls">
             <div class="post-edit-title-group">
-              <label for="result-title-edit">🏷️ Título na arte:</label>
+              <label for="result-title-edit">🏷️ Título na arte e no vídeo:</label>
               <input type="text" id="result-title-edit" maxlength="80" placeholder="Digite o nome do sorteio...">
             </div>
             <div class="post-photo-actions">
               <input type="file" id="winner-photo-upload" accept="image/*" class="hidden-file-input">
               <button type="button" id="btn-upload-photo" class="btn-photo-upload">
-                📷 Enviar / Trocar Foto
+                📷 Foto do Ganhador
               </button>
             </div>
           </div>
 
-          <button type="button" id="btn-download-post" class="btn-download-post">
-            ⬇️ Baixar Arte do Ganhador (PNG Alta Resolução)
-          </button>
+          <!-- Personalização da Sua Marca (Logo + @arroba + Tema de Cores - salvos automaticamente) -->
+          <div class="brand-customizer-panel">
+            <div class="brand-row-top">
+              <span class="brand-panel-label">✨ Sua Marca &amp; Tema de Cores <small>(salvo automaticamente)</small></span>
+              <div class="theme-swatches" role="group" aria-label="Tema de cores da arte e vídeo">
+                <button type="button" class="theme-btn active" data-theme="royal" title="Roxo &amp; Ouro Real">
+                  <span class="swatch swatch-royal"></span> Roxo/Ouro
+                </button>
+                <button type="button" class="theme-btn" data-theme="insta" title="Rosa &amp; Laranja Instagram">
+                  <span class="swatch swatch-insta"></span> Instagram
+                </button>
+                <button type="button" class="theme-btn" data-theme="emerald" title="Verde Esmeralda &amp; Ouro">
+                  <span class="swatch swatch-emerald"></span> Esmeralda
+                </button>
+                <button type="button" class="theme-btn" data-theme="ocean" title="Azul Royal &amp; Neon">
+                  <span class="swatch swatch-ocean"></span> Azul Royal
+                </button>
+              </div>
+            </div>
+
+            <div class="brand-inputs-row">
+              <div class="brand-handle-wrap">
+                <label for="brand-handle-input">🏢 @Arroba / Nome da Sua Página:</label>
+                <input type="text" id="brand-handle-input" maxlength="45" placeholder="Ex: @sualojaoficial" autocomplete="off">
+              </div>
+              <div class="brand-logo-wrap">
+                <input type="file" id="brand-logo-upload" accept="image/*" class="hidden-file-input">
+                <button type="button" id="btn-upload-brand-logo" class="btn-brand-logo">
+                  🖼️ Enviar Logo da Marca
+                </button>
+                <button type="button" id="btn-clear-brand-logo" class="btn-clear-logo hidden" title="Remover logo salva">
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Botões de Download: Imagem PNG + Vídeo do Sorteio -->
+          <div class="media-export-buttons">
+            <button type="button" id="btn-download-post" class="btn-download-post">
+              🖼️ Baixar Imagem (PNG)
+            </button>
+            <button type="button" id="btn-generate-video" class="btn-generate-video">
+              🎬 Gerar e Baixar Vídeo do Sorteio
+            </button>
+          </div>
+
+          <!-- Barra de progresso da gravação do vídeo -->
+          <div id="video-recording-bar" class="video-recording-bar hidden" role="status" aria-live="polite">
+            <div class="video-rec-info">
+              <span class="rec-dot"></span>
+              <span id="video-recording-text">Gravando vídeo oficial do sorteio... 0%</span>
+            </div>
+            <div class="video-rec-track">
+              <div id="video-recording-fill" class="video-rec-fill"></div>
+            </div>
+          </div>
+
+          <!-- Player de pré-visualização e salvamento direto do vídeo gerado -->
+          <div id="video-result-box" class="video-result-box hidden">
+            <div class="video-result-header">
+              <span>✅ Vídeo Oficial Pronto!</span>
+              <a id="btn-save-ready-video" class="btn-save-video-link" download="sorteio.mp4" href="#">
+                ⬇️ Baixar Vídeo Novamente
+              </a>
+            </div>
+            <video id="generated-video-player" controls playsinline></video>
+          </div>
         </div>
 
         <div class="result-actions">
-          <button type="button" id="btn-copy-result" class="btn-secondary">📋 Copiar Resultado Formatado</button>
+          <button type="button" id="btn-download-pdf" class="btn-pdf-cert">📄 Baixar Certificado (PDF)</button>
+          <button type="button" id="btn-copy-result" class="btn-secondary">📋 Copiar Resultado</button>
           <button type="button" id="btn-new-draw" class="btn-outline">Novo Sorteio</button>
         </div>
       </div>
@@ -329,6 +498,24 @@
     <footer class="footer">
       <p>Desenvolvido com imparcialidade criptográfica (Web Crypto API) &bull; SorteadorPro</p>
     </footer>
+  </div>
+
+  <!-- Modal: Histórico de Sorteios Salvos -->
+  <div id="history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+    <div class="modal-card history-modal-card">
+      <div class="modal-header">
+        <h3 id="history-modal-title">📜 Histórico de Sorteios Realizados</h3>
+        <button type="button" id="btn-close-history" class="btn-close-modal" aria-label="Fechar histórico">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="history-subtitle">Seus últimos sorteios ficam salvos automaticamente neste navegador para consulta e novo download.</p>
+        <div id="history-list" class="history-list"></div>
+      </div>
+      <div class="modal-footer history-modal-footer">
+        <button type="button" id="btn-clear-history" class="btn-clear-history">🗑️ Limpar Histórico</button>
+        <button type="button" id="btn-close-history-bottom" class="btn-secondary" style="flex:0 0 auto; padding: 10px 18px;">Fechar</button>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
